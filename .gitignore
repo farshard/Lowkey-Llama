@@ -1,0 +1,87 @@
+# Python environment
+llm_env/
+venv/
+env/
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# LLM specific
+models/
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+vectors/
+embeddings/
+.ollama/
+
+# Project logs and databases
+*.log
+*.sqlite
+*.db
+logs/
+*.log.*
+checkpoint/
+runs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# Build and documentation
+build/
+docs/_build/
+site/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# System specific
+*.bak
+*.tmp
+*.temp
+.DS_Store
+.history
