@@ -2,6 +2,17 @@
 
 A streamlined chat interface for running local language models through Ollama, with both web UI and API access.
 
+## Architecture
+
+```mermaid
+graph LR
+    User((User)) --> Web[Web UI\nStreamlit]
+    User --> API[REST API]
+    Web --> Ollama[Ollama Service]
+    API --> Ollama
+    Ollama --> Models[(Local\nModels)]
+```
+
 ## Quick Start 🚀
 
 1. **Prerequisites**:
