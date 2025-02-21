@@ -60,6 +60,9 @@ runs/
 .DS_Store
 Thumbs.db
 
+# Keep .cursor directory (contains project-specific AI assistant rules)
+!.cursor/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 *.ipynb
