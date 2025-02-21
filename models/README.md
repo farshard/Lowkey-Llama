@@ -17,6 +17,25 @@ Configuration files for language models supported by the Local LLM Chat Interfac
    - High performance, 12GB VRAM
    - Best for: Complex tasks
 
+## Adding a New Model
+
+1. Download model using Ollama:
+   ```bash
+   ollama pull your-model-name
+   ```
+
+2. Create `models/your-model.yaml`:
+   ```yaml
+   name: your-model-name
+   parameters:
+     temperature: 0.7
+     max_tokens: 500
+     top_p: 1.0
+   context_window: 4096
+   ```
+
+3. Add to `config.json` models section
+
 ## Configuration Format
 
 ```yaml
