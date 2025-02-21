@@ -2,21 +2,24 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-import yaml
 import psutil
 import GPUtil
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class ModelManager:
     def __init__(self):
-        # Storage paths
-        self.ssd_path = Path("C:/local-llm/models/active")
-        self.hdd_path = Path("E:/ollama_models")
-        self.default_ollama_path = Path(os.path.expanduser("~/.ollama/models"))
-        self.cache_dir = Path("C:/local-llm/models/active/cache")
+        # Storage paths with environment variable support
+        self.ssd_path = Path(os.getenv('ACTIVE_MODELS_PATH', 'C:/local-llm/models/active'))
+        self.hdd_path = Path(os.getenv('STORAGE_MODELS_PATH', 'E:/ollama_models'))
+        self.default_ollama_path = Path(os.path.expanduser(os.getenv('OLLAMA_MODELS_PATH', '~/.ollama/models')))
+        self.cache_dir = Path(os.getenv('MODELS_CACHE_PATH', 'C:/local-llm/models/active/cache'))
         
         # VRAM constraints
         self.gpu = self.get_gpu_info()
-        self.vram_limit = 8  # GB for RTX 3070
+        self.vram_limit = float(os.getenv('GPU_VRAM_LIMIT', '8'))  # GB for RTX 3070
         
         # Model VRAM requirements (in GB)
         self.model_vram = {

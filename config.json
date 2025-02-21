@@ -1,0 +1,37 @@
+{
+    "ports": {
+        "ollama": 11434,
+        "api": 8000,
+        "streamlit": 8501
+    },
+    "hosts": {
+        "ollama": "localhost",
+        "api": "localhost",
+        "streamlit": "localhost"
+    },
+    "auto_open_browser": true,
+    "default_model": "mistral",
+    "log_level": "info",
+    "models": {
+        "mistral": {
+            "temp": 0.7,
+            "max_tokens": 500,
+            "context_window": 4096
+        },
+        "codellama:34b-instruct-q4": {
+            "temp": 0.5,
+            "max_tokens": 2048,
+            "context_window": 8192
+        },
+        "mixtral:8x7b-instruct-q4": {
+            "temp": 0.7,
+            "max_tokens": 4096,
+            "context_window": 16384
+        },
+        "llama2:70b-q4": {
+            "temp": 0.8,
+            "max_tokens": 4096,
+            "context_window": 4096
+        }
+    }
+} 

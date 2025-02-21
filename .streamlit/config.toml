@@ -1,0 +1,10 @@
+[theme]
+base="dark"
+font="monospace"
+
+[server]
+enableCORS=false
+enableXsrfProtection=false
+
+[browser]
+gatherUsageStats=false 
