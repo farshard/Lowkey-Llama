@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  llm-service:
+    build: 
+      context: .
+      args:
+        - CUDA_VERSION=11.8.0
+        - PYTHON_VERSION=3.9
+    ports:
+      - "11434:11434"  # Ollama API
+      - "8501:8501"    # Streamlit UI
+      - "8000:8000"    # FastAPI
+    environment:
+      - OLLAMA_HOST=http://localhost:11434
+      - STREAMLIT_SERVER_PORT=8501
+      - API_PORT=8000
+      # Hardware-specific settings
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      # Dynamic configuration (set by docker-compose.override.yml)
+      - OLLAMA_GPU_LAYERS=${OLLAMA_GPU_LAYERS:-28}
+      - OLLAMA_CPU_LAYERS=${OLLAMA_CPU_LAYERS:-auto}
+      - OLLAMA_BATCH_SIZE=${OLLAMA_BATCH_SIZE:-4}
+      - OLLAMA_THREAD_COUNT=${OLLAMA_THREAD_COUNT:-16}
+    volumes:
+      - ./.ollama:/root/.ollama
+      - ./models:/app/models
+      - ./cache:/app/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      sh -c "
+        nohup ollama serve &
+        sleep 5 &&
+        nohup uvicorn src.api_server:app --host 0.0.0.0 --port 8000 &
+        streamlit run src/chat_app.py --server.address 0.0.0.0 --server.port 8501
+      "
+
+# Create profile-specific compose files:
+# docker-compose.high-vram.yml:
+#   environment:
+#     - OLLAMA_GPU_LAYERS=35
+#     - OLLAMA_BATCH_SIZE=8
+#     - OLLAMA_THREAD_COUNT=auto
+#
+# docker-compose.medium-vram.yml:
+#   environment:
+#     - OLLAMA_GPU_LAYERS=28
+#     - OLLAMA_BATCH_SIZE=4
+#     - OLLAMA_THREAD_COUNT=16
+#
+# docker-compose.low-vram.yml:
+#   environment:
+#     - OLLAMA_GPU_LAYERS=20
+#     - OLLAMA_BATCH_SIZE=2
+#     - OLLAMA_THREAD_COUNT=8
+#
+# docker-compose.cpu-only.yml:
+#   environment:
+#     - OLLAMA_GPU_LAYERS=0
+#     - OLLAMA_CPU_LAYERS=all
+#     - OLLAMA_BATCH_SIZE=1
+#     - OLLAMA_THREAD_COUNT=auto 

@@ -8,7 +8,8 @@ def check_requirements():
     requirements = {
         'ollama': 'curl https://ollama.ai/install.sh | sh',
         'python': 'Already installed',
-        'git': 'https://git-scm.com/downloads'
+        'git': 'https://git-scm.com/downloads',
+        'docker': 'https://docs.docker.com/get-docker/'
     }
     
     missing = []
@@ -31,16 +32,15 @@ def setup_environment():
     """Set up Python virtual environment and install dependencies"""
     subprocess.run([sys.executable, '-m', 'venv', 'llm_env'])
     
-    # Activate virtual environment
-    if os.name == 'nt':  # Windows
-        activate_script = Path('llm_env/Scripts/activate')
-    else:  # Unix/Linux
-        activate_script = Path('llm_env/bin/activate')
-    
-    # Install required packages
+    # Install both core and API dependencies
     pip_cmd = [sys.executable, '-m', 'pip', 'install', 
-               'streamlit', 'requests', 'python-dotenv']
+               '-r', 'requirements.txt']
     subprocess.run(pip_cmd)
+    
+    # Create .env file if not exists
+    env_file = Path('.env')
+    if not env_file.exists():
+        env_file.write_text("OLLAMA_HOST=http://localhost:11434\n")
 
 def create_chat_interface():
     """Create a simple Streamlit chat interface"""
