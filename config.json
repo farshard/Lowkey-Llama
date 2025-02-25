@@ -33,5 +33,22 @@
             "max_tokens": 4096,
             "context_window": 4096
         }
+    },
+    "privacy": {
+        "privacy_mode": false,
+        "enable_conversation_history": true,
+        "allowed_ip_ranges": ["127.0.0.1"],
+        "telemetry": {
+            "streamlit": false,
+            "ollama": false
+        },
+        "network": {
+            "restrict_to_localhost": true,
+            "verify_connections": true
+        },
+        "storage": {
+            "clear_cache_on_exit": true,
+            "max_conversation_history": 100
+        }
     }
 } 
