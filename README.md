@@ -2,15 +2,17 @@
 
 A private server and web UI for running local language models through Ollama, with API access.
 
+<div align="center">
 <img src="https://github.com/user-attachments/assets/a3e0426a-74af-41a1-bd09-fd2d82a56a22" alt="image" width="80%">
-<p align="center"><i>Streamlit interface</i></p>
+<p><i>Streamlit interface</i></p>
+</div>
 
 
 ## Quick Start 🚀
 
 ### Using Docker (Recommended)
 ```bash
-# Pull and run with one command
+# Pull and run with one command (includes Ollama)
 docker run -d --name local-llm \
   -p 8501:8501 -p 8000:8000 \
   --gpus all \  # Optional: for GPU support
@@ -22,14 +24,24 @@ cd Local-LLM
 docker compose up -d
 
 # ☝️ Docker must be running for commands to work
+# No need to install Ollama separately when using Docker
 ```
 
 ### Manual Setup
 1. **Prerequisites**:
    - Python 3.8+
-   - [Ollama](https://ollama.ai/download)
+   - [Ollama](https://ollama.ai/download) - **REQUIRED**: Must be installed and running first!
 
-2. **Install & Run**:
+2. **Start Ollama**:
+   ```bash
+   # Start Ollama in a terminal window
+   ollama serve
+
+   # In a new terminal window, pull the default model
+   ollama pull mistral
+   ```
+
+3. **Install & Run**:
    ```bash
    # Clone and setup
    git clone https://github.com/voolyvex/Local-LLM.git
@@ -45,7 +57,7 @@ docker compose up -d
    python src/launcher.py
    ```
 
-3. Open `http://localhost:8501` in your browser
+4. Open `http://localhost:8501` in your browser
 
 ## System Requirements
 

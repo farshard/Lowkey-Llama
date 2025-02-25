@@ -113,4 +113,5 @@ async def list_models():
 
 if __name__ == "__main__":
     port = int(os.getenv("API_PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port) 
+    host = os.getenv("API_HOST", "localhost")  # Default to localhost for security
+    uvicorn.run(app, host=host, port=port) 

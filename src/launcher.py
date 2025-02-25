@@ -175,6 +175,10 @@ class ServiceLauncher:
             response = requests.get(f"{ollama_url}/api/tags", timeout=5)
             if response.status_code == 200:
                 self.logger.info("✓ Ollama is running")
+                # Pull default model if specified
+                if self.config.get('default_model'):
+                    if not self.pull_model(self.config['default_model']):
+                        self.logger.warning("Failed to pull default model, but continuing...")
                 return True
         except requests.exceptions.ConnectionError:
             pass
@@ -206,7 +210,8 @@ class ServiceLauncher:
                         self.logger.info("✓ Ollama started successfully")
                         # Pull default model if specified
                         if self.config.get('default_model'):
-                            self.pull_model(self.config['default_model'])
+                            if not self.pull_model(self.config['default_model']):
+                                self.logger.warning("Failed to pull default model, but continuing...")
                         return True
                 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
                     if i < max_retries - 1:
@@ -225,21 +230,44 @@ class ServiceLauncher:
             self.logger.error(f"Error starting Ollama: {str(e)}")
             return False
 
-    def pull_model(self, model_name: str) -> None:
+    def pull_model(self, model_name: str) -> bool:
         """Pull a model if it's not already downloaded"""
         self.logger.info(f"Checking model {model_name}...")
-        try:
-            result = subprocess.run(
-                ['ollama', 'pull', model_name],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            self.logger.info(f"✓ Model {model_name} is ready")
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"✗ Failed to pull model {model_name}: {e.stderr}")
-        except Exception as e:
-            self.logger.error(f"✗ Error pulling model {model_name}: {str(e)}")
+        ollama_cmd = self.get_ollama_cmd()[0].replace(' serve', '').split('/')[-1]  # Get just the command name
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                # First check if model exists
+                check_cmd = [ollama_cmd, 'list']
+                result = subprocess.run(check_cmd, capture_output=True, text=True)
+                if model_name in result.stdout:
+                    self.logger.info(f"✓ Model {model_name} is already downloaded")
+                    return True
+                
+                # If not, pull it
+                self.logger.info(f"Pulling model {model_name} (attempt {attempt + 1}/{max_retries})...")
+                pull_cmd = [ollama_cmd, 'pull', model_name]
+                result = subprocess.run(
+                    pull_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                self.logger.info(f"✓ Model {model_name} is ready")
+                return True
+                
+            except subprocess.CalledProcessError as e:
+                self.logger.warning(f"Failed to pull model {model_name} (attempt {attempt + 1}): {e.stderr}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)  # Wait before retrying
+                else:
+                    self.logger.error(f"✗ Failed to pull model {model_name} after {max_retries} attempts")
+                    return False
+            except Exception as e:
+                self.logger.error(f"✗ Error pulling model {model_name}: {str(e)}")
+                return False
+        return False
 
     def cleanup(self):
         """Clean up temporary files and resources"""
