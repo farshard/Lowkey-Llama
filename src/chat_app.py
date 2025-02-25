@@ -53,6 +53,43 @@ MODEL_CONFIGS = {
 
 # Sidebar for settings
 with st.sidebar:
+    # Model settings section
+    st.header("Model Settings")
+    selected_model = st.selectbox(
+        "Choose a model",
+        list(MODEL_CONFIGS.keys()),
+        index=0
+    )
+    
+    model_config = MODEL_CONFIGS[selected_model]
+    temperature = st.slider(
+        "Temperature",
+        min_value=0.0,
+        max_value=1.0,
+        value=model_config["temp"],
+        step=0.1
+    )
+    
+    max_tokens = st.slider(
+        "Max Tokens",
+        min_value=100,
+        max_value=model_config["context_window"],
+        value=model_config["max_tokens"],
+        step=100
+    )
+    
+    st.info(f"""Model: {selected_model}
+    Context Window: {model_config['context_window']}
+    Recommended for: {'Code generation' if 'codellama' in selected_model 
+                     else 'General reasoning' if 'mixtral' in selected_model
+                     else 'Complex tasks' if 'llama2' in selected_model
+                     else 'General purpose'}""")
+
+    # TTS settings
+    st.header("Text-to-Speech")
+    st.session_state.tts_enabled = st.toggle("Enable voice responses", value=st.session_state.tts_enabled)
+
+    # Privacy settings
     st.header("Privacy Settings")
     privacy_mode = st.toggle(
         "Privacy Mode",
@@ -92,41 +129,14 @@ with st.sidebar:
         privacy_manager.clear_conversation_history()
         st.success("All conversation history and cache cleared!")
 
-    # Model settings section
-    st.header("Model Settings")
-    selected_model = st.selectbox(
-        "Choose a model",
-        list(MODEL_CONFIGS.keys()),
-        index=0
-    )
-    
-    model_config = MODEL_CONFIGS[selected_model]
-    temperature = st.slider(
-        "Temperature",
-        min_value=0.0,
-        max_value=1.0,
-        value=model_config["temp"],
-        step=0.1
-    )
-    
-    max_tokens = st.slider(
-        "Max Tokens",
-        min_value=100,
-        max_value=model_config["context_window"],
-        value=model_config["max_tokens"],
-        step=100
-    )
-    
-    st.info(f"""Model: {selected_model}
-    Context Window: {model_config['context_window']}
-    Recommended for: {'Code generation' if 'codellama' in selected_model 
-                     else 'General reasoning' if 'mixtral' in selected_model
-                     else 'Complex tasks' if 'llama2' in selected_model
-                     else 'General purpose'}""")
-
-    # TTS settings
-    st.header("Text-to-Speech")
-    st.session_state.tts_enabled = st.toggle("Enable voice responses", value=st.session_state.tts_enabled)
+    # Security audit
+    st.header("Security Audit")
+    with st.expander("Dependency Audit"):
+        dependencies = privacy_manager.audit_dependencies()
+        for dep, info in dependencies.items():
+            st.write(f"**{dep}**")
+            for key, value in info.items():
+                st.write(f"- {key.replace('_', ' ').title()}: {'Yes' if value else 'No'}")
 
 # Display privacy warning if needed
 if not all(privacy_manager.verify_network_isolation().values()):
@@ -193,16 +203,6 @@ if prompt := st.chat_input("What's on your mind?"):
     except Exception as e:
         error_message = f"⚠️ An error occurred: {str(e)}"
         st.error(error_message)
-
-# Add dependency audit information
-with st.sidebar:
-    st.header("Security Audit")
-    with st.expander("Dependency Audit"):
-        dependencies = privacy_manager.audit_dependencies()
-        for dep, info in dependencies.items():
-            st.write(f"**{dep}**")
-            for key, value in info.items():
-                st.write(f"- {key.replace('_', ' ').title()}: {'Yes' if value else 'No'}")
 
 def text_to_speech(text):
     """Convert text to speech and return the audio player HTML"""
