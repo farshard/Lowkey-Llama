@@ -30,9 +30,14 @@ docker compose up -d
 ### Manual Setup
 1. **Prerequisites**:
    - Python 3.8+
-   - [Ollama](https://ollama.ai/download) - **REQUIRED**: Must be installed and running first!
+   - [Ollama](https://ollama.ai/download) - **REQUIRED**: Must be installed first!
 
-2. **Start Ollama**:
+2. **Install Python dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Start Ollama**:
    ```bash
    # Start Ollama in a terminal window
    ollama serve
@@ -41,7 +46,7 @@ docker compose up -d
    ollama pull mistral
    ```
 
-3. **Install & Run**:
+4. **Start the application**:
    ```bash
    # Clone and setup
    git clone https://github.com/voolyvex/Local-LLM.git
@@ -52,12 +57,11 @@ docker compose up -d
    # Windows:           # macOS/Linux:
    .\venv\Scripts\activate    # source venv/bin/activate
 
-   # Install and launch
-   pip install -r requirements.txt
+   # Start the application
    python src/launcher.py
    ```
 
-4. Open `http://localhost:8501` in your browser
+5. Open `http://localhost:8501` in your browser
 
 ## System Requirements
 
