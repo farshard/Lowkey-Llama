@@ -1,6 +1,7 @@
 # Local LLM Chat Interface 🤖
 
 A streamlined chat interface for running local language models through Ollama, with both web UI and API access.
+<img src="https://github.com/user-attachments/assets/a3e0426a-74af-41a1-bd09-fd2d82a56a22" alt="image" width="50%">
 
 ## Quick Start 🚀
 
@@ -16,6 +17,8 @@ docker run -d --name local-llm \
 git clone https://github.com/voolyvex/Local-LLM.git
 cd Local-LLM
 docker compose up -d
+
+# ☝️ Docker must be running for commands to work
 ```
 
 ### Manual Setup
@@ -85,6 +88,8 @@ Rel(launcher, ollama, "Starts and monitors")
 - [Platform Setup Guide](docs/platform_setup.md)
 - [API Documentation](docs/api.md)
 - [Troubleshooting](docs/platform_setup.md#troubleshooting-checklist)
+
+
 
 ## License
 
