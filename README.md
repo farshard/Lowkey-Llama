@@ -1,7 +1,10 @@
 # Local LLM Chat Interface 🤖
 
-A streamlined chat interface for running local language models through Ollama, with both web UI and API access.
-<img src="https://github.com/user-attachments/assets/a3e0426a-74af-41a1-bd09-fd2d82a56a22" alt="image" width="50%">
+A private server and web UI for running local language models through Ollama, with API access.
+
+<img src="https://github.com/user-attachments/assets/a3e0426a-74af-41a1-bd09-fd2d82a56a22" alt="image" width="80%">
+<p align="center"><i>Streamlit interface</i></p>
+
 
 ## Quick Start 🚀
 
