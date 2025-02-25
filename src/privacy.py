@@ -10,10 +10,11 @@ import streamlit as st
 class PrivacyManager:
     def __init__(self, config_path: str = "config.json"):
         self.config_path = config_path
-        self.privacy_mode: bool = False
-        self.conversation_history_enabled: bool = True
+        self.privacy_mode = True  # Always enabled
+        self.conversation_history_enabled = True  # Always enabled
         self.allowed_ip_ranges: List[str] = ["127.0.0.1"]
         self.load_config()
+        self.configure_environment()
         
     def load_config(self) -> None:
         """Load privacy settings from config file."""
@@ -21,8 +22,6 @@ class PrivacyManager:
             with open(self.config_path, 'r') as f:
                 config = json.load(f)
                 privacy_config = config.get('privacy', {})
-                self.privacy_mode = privacy_config.get('privacy_mode', False)
-                self.conversation_history_enabled = privacy_config.get('enable_conversation_history', True)
                 self.allowed_ip_ranges = privacy_config.get('allowed_ip_ranges', ["127.0.0.1"])
         except FileNotFoundError:
             logging.warning(f"Config file {self.config_path} not found. Using default privacy settings.")
@@ -121,14 +120,30 @@ class PrivacyManager:
                 "is_disabled": True
             }
         }
-        return dependencies
 
-    def toggle_privacy_mode(self, enable: bool) -> None:
-        """Toggle privacy mode on/off."""
-        self.privacy_mode = enable
-        if enable:
-            self.configure_environment()
-        self.save_config()
+        if self.privacy_mode:
+            # Additional privacy checks when privacy mode is enabled
+            dependencies["streamlit"]["network_isolation"] = os.getenv("STREAMLIT_SERVER_ADDRESS") == "localhost"
+            dependencies["ollama"]["network_isolation"] = os.getenv("OLLAMA_HOST") == "localhost"
+            dependencies["requests"]["network_isolation"] = True  # Local API only
+            
+            # Check for secure storage
+            dependencies["conversation_history"] = {
+                "has_telemetry": False,
+                "can_disable": True,
+                "is_disabled": not self.conversation_history_enabled,
+                "secure_storage": True  # Local storage only
+            }
+            
+            # Check TTS privacy
+            dependencies["gtts"] = {
+                "has_telemetry": True,
+                "can_disable": True,
+                "is_disabled": True,  # TTS is automatically disabled in privacy mode
+                "network_isolation": True
+            }
+        
+        return dependencies
 
     def is_ip_allowed(self, ip: str) -> bool:
         """Check if an IP address is allowed to access the application."""

@@ -58,12 +58,23 @@ async def generate_text(request: GenerationRequest):
         
         logger.debug(f"Sending request to Ollama with payload: {payload}")
         
-        # Make the request to Ollama
+        # Check if Ollama is running first
+        try:
+            health_check = requests.get('http://localhost:11434/api/tags', timeout=5)
+            health_check.raise_for_status()
+        except requests.exceptions.RequestException:
+            raise HTTPException(
+                status_code=503,
+                detail="Ollama service is not running. Please ensure Ollama is installed and running with 'ollama serve'"
+            )
+        
+        # Make the request to Ollama with increased timeout
         response = requests.post(
             'http://localhost:11434/api/generate',
             json=payload,
             headers={'Content-Type': 'application/json'},
-            stream=True
+            stream=True,
+            timeout=60  # Increased timeout for model loading
         )
         response.raise_for_status()
         
@@ -73,6 +84,8 @@ async def generate_text(request: GenerationRequest):
             if line:
                 try:
                     chunk = json.loads(line.decode('utf-8'))
+                    if 'error' in chunk:
+                        raise HTTPException(status_code=500, detail=chunk['error'])
                     if 'response' in chunk:
                         full_response += chunk['response']
                 except json.JSONDecodeError:
@@ -81,15 +94,25 @@ async def generate_text(request: GenerationRequest):
                     logger.error(f"Error processing chunk: {e}")
                     continue
         
+        if not full_response:
+            raise HTTPException(status_code=500, detail="No response generated from the model")
+            
         return {"response": full_response}
+    except requests.exceptions.Timeout:
+        logger.error("Request timed out")
+        raise HTTPException(
+            status_code=504,
+            detail="Request timed out. This can happen if the model is still loading or if Ollama is busy."
+        )
     except requests.exceptions.ConnectionError as e:
         logger.error(f"Connection error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Cannot connect to Ollama service: {str(e)}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request error: {str(e)}")
-        if hasattr(e.response, 'text'):
-            logger.error(f"Response text: {e.response.text}")
-        raise HTTPException(status_code=500, detail=f"Ollama API error: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot connect to Ollama service. Please ensure Ollama is running with 'ollama serve'"
+        )
+    except HTTPException as e:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

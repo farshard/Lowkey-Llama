@@ -33,12 +33,5 @@
             "max_tokens": 4096,
             "context_window": 4096
         }
-    },
-    "privacy": {
-        "privacy_mode": false,
-        "enable_conversation_history": false,
-        "allowed_ip_ranges": [
-            "127.0.0.1"
-        ]
     }
 }

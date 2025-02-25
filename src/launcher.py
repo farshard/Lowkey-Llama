@@ -149,13 +149,29 @@ class ServiceLauncher:
     def get_ollama_cmd(self) -> List[str]:
         """Get platform-specific Ollama command"""
         if self.platform == 'windows':
-            ollama_path = os.path.join(os.getenv('PROGRAMFILES', 'C:\\Program Files'), 'Ollama', 'ollama.exe')
-            return [ollama_path, 'serve']
+            # Check multiple possible Windows installation paths
+            possible_paths = [
+                os.path.join(os.getenv('PROGRAMFILES', 'C:\\Program Files'), 'Ollama', 'ollama.exe'),
+                os.path.join(os.getenv('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'), 'Ollama', 'ollama.exe'),
+                os.path.join(os.getenv('LOCALAPPDATA', ''), 'Ollama', 'ollama.exe'),
+                # Add the path if it's in PATH
+                shutil.which('ollama.exe')
+            ]
+            # Use the first valid path
+            for path in possible_paths:
+                if path and os.path.isfile(path):
+                    return [path, 'serve']
+            # If no path found, return default (will be caught by check_ollama)
+            return ['ollama.exe', 'serve']
         elif self.platform == 'darwin':  # macOS
             if platform.machine() == 'arm64':
                 return ['/opt/homebrew/bin/ollama', 'serve']
             return ['/usr/local/bin/ollama', 'serve']
         else:  # Linux
+            # Try to find ollama in PATH first
+            ollama_path = shutil.which('ollama')
+            if ollama_path:
+                return [ollama_path, 'serve']
             return ['/usr/local/bin/ollama', 'serve']
 
     def check_port_available(self, port: int) -> bool:
@@ -169,6 +185,25 @@ class ServiceLauncher:
 
     def check_ollama(self) -> bool:
         """Check if Ollama is running and start it if needed"""
+        # First check if Ollama is installed
+        try:
+            if self.platform == 'windows':
+                result = subprocess.run(['where', 'ollama'], capture_output=True, text=True)
+            else:
+                result = subprocess.run(['which', 'ollama'], capture_output=True, text=True)
+            if result.returncode != 0:
+                self.logger.error("❌ Ollama is not installed. Please install it from https://ollama.ai/download")
+                print("\n=== Installation Required ===")
+                print("Ollama is not installed on your system.")
+                print("1. Download Ollama from: https://ollama.ai/download")
+                print("2. Run the installer")
+                print("3. Restart your terminal/command prompt")
+                print("4. Run this application again")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error checking Ollama installation: {str(e)}")
+            return False
+
         ollama_url = f"http://{self.config['hosts']['ollama']}:{self.config['ports']['ollama']}"
         
         try:
@@ -177,8 +212,16 @@ class ServiceLauncher:
                 self.logger.info("✓ Ollama is running")
                 # Pull default model if specified
                 if self.config.get('default_model'):
-                    if not self.pull_model(self.config['default_model']):
-                        self.logger.warning("Failed to pull default model, but continuing...")
+                    try:
+                        if not self.pull_model(self.config['default_model']):
+                            self.logger.warning(f"Failed to pull model {self.config['default_model']}")
+                            print(f"\n=== Model Download Required ===")
+                            print(f"The default model '{self.config['default_model']}' needs to be downloaded.")
+                            print(f"You can download it by running:")
+                            print(f"ollama pull {self.config['default_model']}")
+                            print("\nThe application will continue, but you'll need to pull the model before using it.")
+                    except Exception as e:
+                        self.logger.error(f"Error pulling model: {str(e)}")
                 return True
         except requests.exceptions.ConnectionError:
             pass
@@ -208,10 +251,6 @@ class ServiceLauncher:
                     response = requests.get(f"{ollama_url}/api/tags", timeout=5)
                     if response.status_code == 200:
                         self.logger.info("✓ Ollama started successfully")
-                        # Pull default model if specified
-                        if self.config.get('default_model'):
-                            if not self.pull_model(self.config['default_model']):
-                                self.logger.warning("Failed to pull default model, but continuing...")
                         return True
                 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
                     if i < max_retries - 1:
@@ -221,26 +260,46 @@ class ServiceLauncher:
                     return False
         except FileNotFoundError:
             self.logger.error("✗ Ollama not found. Please install it first.")
-            if self.platform == 'darwin':
-                print("Install with: brew install ollama")
-            else:
-                print("Visit: https://ollama.ai/download")
+            print("\n=== Installation Required ===")
+            print("Ollama is not installed on your system.")
+            print("1. Download Ollama from: https://ollama.ai/download")
+            print("2. Run the installer")
+            print("3. Restart your terminal/command prompt")
+            print("4. Run this application again")
             return False
         except Exception as e:
             self.logger.error(f"Error starting Ollama: {str(e)}")
             return False
+        return False
 
     def pull_model(self, model_name: str) -> bool:
         """Pull a model if it's not already downloaded"""
         self.logger.info(f"Checking model {model_name}...")
-        ollama_cmd = self.get_ollama_cmd()[0].replace(' serve', '').split('/')[-1]  # Get just the command name
-        max_retries = 3
         
+        # Get the ollama command path
+        ollama_cmd = self.get_ollama_cmd()[0]
+        if self.platform == 'windows':
+            # For Windows, we need to handle the case where ollama.exe might be in different locations
+            if ollama_cmd.endswith('serve'):
+                ollama_cmd = ollama_cmd[:-5]  # Remove 'serve'
+            if not os.path.isfile(ollama_cmd):
+                # Try to find it in PATH
+                ollama_cmd = shutil.which('ollama.exe') or 'ollama.exe'
+        else:
+            # For Unix systems, strip 'serve' from the command if present
+            ollama_cmd = ollama_cmd.replace(' serve', '')
+        
+        max_retries = 3
         for attempt in range(max_retries):
             try:
                 # First check if model exists
                 check_cmd = [ollama_cmd, 'list']
-                result = subprocess.run(check_cmd, capture_output=True, text=True)
+                result = subprocess.run(
+                    check_cmd,
+                    capture_output=True,
+                    text=True,
+                    env=os.environ.copy()
+                )
                 if model_name in result.stdout:
                     self.logger.info(f"✓ Model {model_name} is already downloaded")
                     return True
@@ -248,17 +307,34 @@ class ServiceLauncher:
                 # If not, pull it
                 self.logger.info(f"Pulling model {model_name} (attempt {attempt + 1}/{max_retries})...")
                 pull_cmd = [ollama_cmd, 'pull', model_name]
-                result = subprocess.run(
-                    pull_cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
+                
+                # For Windows, we need to handle the console output differently
+                if self.platform == 'windows':
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    result = subprocess.run(
+                        pull_cmd,
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        startupinfo=startupinfo,
+                        env=os.environ.copy()
+                    )
+                else:
+                    result = subprocess.run(
+                        pull_cmd,
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        env=os.environ.copy()
+                    )
+                
                 self.logger.info(f"✓ Model {model_name} is ready")
                 return True
                 
             except subprocess.CalledProcessError as e:
-                self.logger.warning(f"Failed to pull model {model_name} (attempt {attempt + 1}): {e.stderr}")
+                error_msg = e.stderr if e.stderr else str(e)
+                self.logger.warning(f"Failed to pull model {model_name} (attempt {attempt + 1}): {error_msg}")
                 if attempt < max_retries - 1:
                     time.sleep(5)  # Wait before retrying
                 else:

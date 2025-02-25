@@ -13,7 +13,6 @@ from privacy import PrivacyManager
 
 # Initialize privacy manager
 privacy_manager = PrivacyManager()
-privacy_manager.configure_environment()
 
 st.title("Local LLM Chat Interface")
 
@@ -24,8 +23,6 @@ if "tts_enabled" not in st.session_state:
     st.session_state.tts_enabled = False
 if "temp_audio_files" not in st.session_state:
     st.session_state.temp_audio_files = []
-if "privacy_mode" not in st.session_state:
-    st.session_state.privacy_mode = privacy_manager.privacy_mode
 
 # Model configurations
 MODEL_CONFIGS = {
@@ -88,71 +85,21 @@ with st.sidebar:
     # TTS settings
     st.header("Text-to-Speech")
     st.session_state.tts_enabled = st.toggle("Enable voice responses", value=st.session_state.tts_enabled)
-
-    # Privacy settings
-    st.header("Privacy Settings")
-    privacy_mode = st.toggle(
-        "Privacy Mode",
-        value=st.session_state.privacy_mode,
-        help="Enable enhanced privacy features"
-    )
     
-    # Update privacy mode if changed
-    if privacy_mode != st.session_state.privacy_mode:
-        privacy_manager.toggle_privacy_mode(privacy_mode)
-        st.session_state.privacy_mode = privacy_mode
-    
-    # Show privacy status
-    if privacy_mode:
-        st.success("🔒 Privacy Mode Active")
-        telemetry_status = privacy_manager.verify_telemetry_disabled()
-        network_status = privacy_manager.verify_network_isolation()
-        
-        with st.expander("Privacy Status"):
-            for key, value in telemetry_status.items():
-                st.write(f"{'✅' if value else '❌'} {key.replace('_', ' ').title()}")
-            for key, value in network_status.items():
-                st.write(f"{'✅' if value else '❌'} {key.replace('_', ' ').title()}")
-    
-    # Conversation history settings
-    st.header("History Settings")
-    enable_history = st.checkbox(
-        "Enable Conversation History",
-        value=privacy_manager.conversation_history_enabled,
-        help="Store chat history locally"
-    )
-    if enable_history != privacy_manager.conversation_history_enabled:
-        privacy_manager.conversation_history_enabled = enable_history
-        privacy_manager.save_config()
-    
-    if st.button("Clear All Data"):
+    # Clear chat button
+    if st.button("Clear Chat"):
         privacy_manager.clear_conversation_history()
-        st.success("All conversation history and cache cleared!")
-
-    # Security audit
-    st.header("Security Audit")
-    with st.expander("Dependency Audit"):
-        dependencies = privacy_manager.audit_dependencies()
-        for dep, info in dependencies.items():
-            st.write(f"**{dep}**")
-            for key, value in info.items():
-                st.write(f"- {key.replace('_', ' ').title()}: {'Yes' if value else 'No'}")
-
-# Display privacy warning if needed
-if not all(privacy_manager.verify_network_isolation().values()):
-    st.warning("⚠️ Warning: Application may be accessible from external networks. Enable Privacy Mode for enhanced security.")
+        st.success("Chat history cleared!")
 
 # Display chat messages
-if privacy_manager.conversation_history_enabled:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
 # Chat input
 if prompt := st.chat_input("What's on your mind?"):
     # Add user message to chat history
-    if privacy_manager.conversation_history_enabled:
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.messages.append({"role": "user", "content": prompt})
     
     # Display user message
     with st.chat_message("user"):
@@ -170,7 +117,7 @@ if prompt := st.chat_input("What's on your mind?"):
                     "temperature": temperature
                 },
                 headers={'Content-Type': 'application/json'},
-                timeout=30  # Add 30-second timeout
+                timeout=30
             )
             response.raise_for_status()
             
@@ -179,12 +126,11 @@ if prompt := st.chat_input("What's on your mind?"):
             assistant_response = result.get('response', '')
             
             if assistant_response:
-                if privacy_manager.conversation_history_enabled:
-                    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+                st.session_state.messages.append({"role": "assistant", "content": assistant_response})
                 with st.chat_message("assistant"):
                     st.markdown(assistant_response)
                     # Generate and play audio if TTS is enabled
-                    if st.session_state.tts_enabled and not privacy_mode:  # Disable TTS in privacy mode
+                    if st.session_state.tts_enabled:
                         audio_html = text_to_speech(assistant_response)
                         if audio_html:
                             st.markdown(audio_html, unsafe_allow_html=True)
@@ -246,7 +192,7 @@ def text_to_speech(text):
     except Exception as e:
         st.error(f"Error generating speech: {str(e)}")
         return None
-    
+
 # Cleanup function for temp files
 def cleanup_temp_files():
     for file in st.session_state.temp_audio_files:

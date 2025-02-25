@@ -31,37 +31,75 @@ docker compose up -d
 1. **Prerequisites**:
    - Python 3.8+
    - [Ollama](https://ollama.ai/download) - **REQUIRED**: Must be installed first!
+     - Windows: Run installer and restart your terminal
+     - macOS: `brew install ollama`
+     - Linux: `curl -fsSL https://ollama.ai/install.sh | bash`
 
 2. **Install Python dependencies**:
    ```bash
+   # Clone and setup
+   git clone https://github.com/voolyvex/Local-LLM.git
+   cd Local-LLM
+   
+   # Create and activate virtual environment
+   # Windows:
+   python -m venv venv
+   .\venv\Scripts\activate
+   
+   # macOS/Linux:
+   python3 -m venv venv
+   source venv/bin/activate
+   
+   # Install dependencies
    pip install -r requirements.txt
    ```
 
 3. **Start Ollama**:
    ```bash
    # Start Ollama in a terminal window
+   # Windows: Make sure you've restarted your terminal after installation
    ollama serve
-
+   
    # In a new terminal window, pull the default model
    ollama pull mistral
    ```
 
 4. **Start the application**:
    ```bash
-   # Clone and setup
-   git clone https://github.com/voolyvex/Local-LLM.git
-   cd Local-LLM
-   python -m venv venv
-
-   # Activate virtual environment
-   # Windows:           # macOS/Linux:
-   .\venv\Scripts\activate    # source venv/bin/activate
-
-   # Start the application
+   # Make sure you're in the Local-LLM directory
+   # and your virtual environment is activated
+   
    python src/launcher.py
    ```
 
 5. Open `http://localhost:8501` in your browser
+
+### Troubleshooting
+
+1. **Ollama Not Found**:
+   - Windows: Make sure you've restarted your terminal after installation
+   - Check if Ollama is in your PATH
+   - Try running with full path:
+     - Windows: `"C:\Program Files\Ollama\ollama.exe" serve`
+     - macOS: `/opt/homebrew/bin/ollama serve` or `/usr/local/bin/ollama serve`
+     - Linux: `/usr/local/bin/ollama serve`
+
+2. **Port Already in Use**:
+   - Check if Ollama is already running: `netstat -ano | findstr :11434`
+   - Windows: Check Task Manager for `ollama.exe`
+   - Unix: `ps aux | grep ollama`
+
+3. **Model Download Issues**:
+   - Ensure you have stable internet connection
+   - Try pulling the model manually: `ollama pull mistral`
+   - Check disk space in Ollama's model directory:
+     - Windows: `%LOCALAPPDATA%\Ollama`
+     - macOS/Linux: `~/.ollama`
+
+4. **API Timeouts**:
+   - First model run may take longer to load
+   - Increase available memory for Ollama
+   - Check system resources (CPU/RAM usage)
 
 ## System Requirements
 
