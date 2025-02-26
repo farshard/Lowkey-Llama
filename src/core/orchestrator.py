@@ -42,9 +42,16 @@ class SystemOrchestrator:
         """
         self.project_root = project_root or Path(__file__).parent.parent.parent
         self.dependency_manager = DependencyManager(self.project_root)
-        self.system_init = SystemInit()
+        self.system_init = None
         self.ollama_server = OllamaServer()
         self.ollama_client = None
+        
+    async def _init_system(self):
+        """Initialize the system components."""
+        if not self.system_init:
+            self.system_init = SystemInit()
+            if not await self.system_init.initialize():
+                raise Exception("Failed to initialize system configuration")
         
     async def _check_port(self, port: int, retries: int = 5, delay: float = 1.0) -> bool:
         """Check if a port is available.
@@ -135,10 +142,14 @@ class SystemOrchestrator:
                         
                     # Check for default model
                     models = await client.list_models()
-                    default_model = self.system_init.config.get("models", {}).get("default", "mistral")
+                    if not hasattr(self.system_init, 'config'):
+                        logger.error("System configuration not loaded")
+                        return False
+                        
+                    default_model = getattr(self.system_init.config, 'default_model', 'mistral')
+                    logger.info(f"Pulling default model: {default_model}")
                     
-                    if default_model not in models:
-                        logger.info(f"Pulling default model: {default_model}")
+                    if not models or default_model not in models:
                         try:
                             async for progress in client.pull_model(default_model):
                                 if "status" in progress and "completed" in progress and "total" in progress:
@@ -162,9 +173,8 @@ class SystemOrchestrator:
                         logger.error(f"Model test failed: {e}")
                         return False
                         
-                logger.info("Ollama verified")
-                return True
-                
+                    return True
+                    
             except Exception as e:
                 logger.error(f"Ollama check failed: {e}")
                 return False
@@ -173,8 +183,9 @@ class SystemOrchestrator:
         """Save the current configuration to file."""
         try:
             config_path = Path(self.project_root) / "config.json"
+            config_dict = self.system_init.config.model_dump()
             with open(config_path, 'w') as f:
-                json.dump(self.system_init.config, f, indent=4)
+                json.dump(config_dict, f, indent=4)
             logger.info("Configuration updated and saved")
             return True
         except Exception as e:
@@ -186,7 +197,7 @@ class SystemOrchestrator:
         with console.status("[bold blue]Starting API server...") as status:
             try:
                 # Get default port and fallback ports
-                default_port = self.system_init.config.get("ports", {}).get("api", 8000)
+                default_port = self.system_init.config.ports.api
                 fallback_ports = [8001, 8002, 8003, 8004, 8005]  # List of fallback ports to try
                 
                 # Try default port first
@@ -208,16 +219,14 @@ class SystemOrchestrator:
                     return False
                     
                 # Update config with the port we're using
-                if "ports" not in self.system_init.config:
-                    self.system_init.config["ports"] = {}
-                self.system_init.config["ports"]["api"] = port_to_use
+                self.system_init.config.ports.api = port_to_use
                 
                 # Save the updated configuration
                 await self._save_config()
                 
                 # Initialize API server if not already initialized
                 if not hasattr(self.system_init, 'api_server') or not self.system_init.api_server:
-                    api_host = self.system_init.config.get("hosts", {}).get("api", "localhost")
+                    api_host = self.system_init.config.hosts.api
                     from core.api import APIServer
                     self.system_init.api_server = APIServer(host=api_host, port=port_to_use)
                 
@@ -225,52 +234,30 @@ class SystemOrchestrator:
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
-                        # Start the server in a background process
-                        process = await asyncio.create_subprocess_exec(
-                            'uvicorn',
-                            'api.main:app',
-                            '--host', '0.0.0.0',
-                            '--port', str(port_to_use),
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                            # Don't create a new console window
-                            creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == 'Windows' else 0
-                        )
+                        # Start the server
+                        await self.system_init.api_server.start()
                         
-                        # Store the process
-                        self.system_init.api_server.process = process
-                        logger.info(f"API server process started with PID: {process.pid}")
+                        # Wait for server to be healthy with timeout
+                        timeout = 30  # 30 seconds timeout
+                        start_time = time.time()
                         
-                        # Wait for server to be healthy
-                        for _ in range(10):  # Increased timeout
+                        while time.time() - start_time < timeout:
                             try:
-                                # Check if process is still running
-                                if process.returncode is not None:
-                                    stdout, stderr = await process.communicate()
-                                    logger.error(f"API server process exited with code {process.returncode}")
-                                    logger.error(f"stdout: {stdout.decode()}")
-                                    logger.error(f"stderr: {stderr.decode()}")
-                                    break
-                                    
-                                # Check server health
-                                async with aiohttp.ClientSession() as session:
-                                    async with session.get(f"http://localhost:{port_to_use}/health", timeout=2) as response:
-                                        if response.status == 200:
-                                            logger.info(f"API server started on port {port_to_use}")
-                                            return True
-                            except (aiohttp.ClientError, asyncio.TimeoutError):
-                                await asyncio.sleep(1)
-                                continue
+                                if await self.system_init.api_server.health_check():
+                                    logger.info(f"API server started and healthy on port {port_to_use}")
+                                    return True
+                            except Exception as e:
+                                logger.debug(f"Health check attempt failed: {e}")
+                            await asyncio.sleep(1)
+                            status.update(f"[bold blue]Waiting for API server to be ready... ({int(time.time() - start_time)}s)")
                             
-                        # If we get here, server didn't start properly
+                        # If we get here, server didn't become healthy in time
                         if attempt < max_retries - 1:
-                            logger.warning(f"API server health check failed, retrying... (attempt {attempt + 1}/{max_retries})")
-                            if process and process.returncode is None:
-                                process.terminate()
-                                await process.wait()
+                            logger.warning(f"API server health check timed out, retrying... (attempt {attempt + 1}/{max_retries})")
+                            await self.system_init.api_server.stop()
                             await asyncio.sleep(2)
                         else:
-                            logger.error("API server failed to start after retries")
+                            logger.error("API server failed to become healthy after retries")
                             return False
                             
                     except Exception as e:
@@ -288,33 +275,44 @@ class SystemOrchestrator:
                 return False
                 
     async def ensure_ui_server(self) -> bool:
-        """Ensure Streamlit UI server is running."""
+        """Ensure UI server is running and healthy."""
         with console.status("[bold blue]Starting UI server...") as status:
             try:
-                # Check if port is available
-                ui_port = self.system_init.config.get("ports", {}).get("ui", 8501)
-                if not await self._check_port(ui_port):
-                    # Try fallback ports
-                    fallback_ports = [8502, 8503, 8504, 8505]
+                logger.info("Initializing UI server...")
+                
+                # Get default port and fallback ports
+                default_port = self.system_init.config.ports.ui
+                fallback_ports = [8502, 8503, 8504, 8505]  # List of fallback ports to try
+                
+                # Try default port first
+                port_to_use = default_port
+                port_available = await self._check_port(port_to_use)
+                
+                # If default port is not available, try fallback ports
+                if not port_available:
+                    logger.warning(f"Default port {default_port} is unavailable, trying fallback ports...")
                     for port in fallback_ports:
                         if await self._check_port(port):
-                            ui_port = port
-                            # Update config with new port
-                            if "ports" not in self.system_init.config:
-                                self.system_init.config["ports"] = {}
-                            self.system_init.config["ports"]["ui"] = port
-                            # Save the updated configuration
-                            await self._save_config()
-                            logger.info(f"Using fallback port {port} for UI server")
+                            port_to_use = port
+                            port_available = True
+                            logger.info(f"Using fallback port {port}")
                             break
-                    else:
-                        logger.error(f"No available ports found for UI server")
-                        return False
-
+                            
+                if not port_available:
+                    logger.error("No available ports found for UI server")
+                    return False
+                    
+                # Update config with the port we're using
+                self.system_init.config.ports.ui = port_to_use
+                
+                # Save the updated configuration
+                await self._save_config()
+                
                 # Initialize UI server if not already initialized
                 if not hasattr(self.system_init, 'ui_server') or not self.system_init.ui_server:
-                    api_host = self.system_init.config.get("hosts", {}).get("api", "localhost")
-                    api_port = self.system_init.config.get("ports", {}).get("api", 8000)
+                    logger.info("Creating UI server instance...")
+                    api_host = self.system_init.config.hosts.api
+                    api_port = self.system_init.config.ports.api
                     from core.ui import UIServer
                     self.system_init.ui_server = UIServer(api_host=api_host, api_port=api_port)
                 
@@ -322,33 +320,36 @@ class SystemOrchestrator:
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
+                        logger.info(f"Starting UI server (attempt {attempt + 1}/{max_retries})...")
+                        # Start the server
                         await self.system_init.ui_server.start()
                         
-                        # Wait for server to be healthy
-                        for _ in range(30):  # Longer timeout for UI server
+                        # Wait for server to be healthy with timeout
+                        timeout = 30  # 30 seconds timeout
+                        start_time = time.time()
+                        
+                        while time.time() - start_time < timeout:
                             try:
                                 if await self.system_init.ui_server.health_check():
-                                    # Open browser if configured
-                                    if self.system_init.config.get("auto_open_browser", True):
-                                        import webbrowser
-                                        webbrowser.open(f"http://localhost:{ui_port}")
-                                    logger.info("UI server started")
+                                    logger.info(f"UI server started and healthy on port {port_to_use}")
                                     return True
-                            except Exception:
-                                pass
-                            await asyncio.sleep(2)
+                            except Exception as e:
+                                logger.debug(f"UI health check attempt failed: {e}")
+                            await asyncio.sleep(1)
+                            status.update(f"[bold blue]Waiting for UI server to be ready... ({int(time.time() - start_time)}s)")
                             
+                        # If we get here, server didn't become healthy in time
                         if attempt < max_retries - 1:
-                            logger.warning(f"UI server health check failed, retrying... (attempt {attempt + 1}/{max_retries})")
+                            logger.warning(f"UI server health check timed out, retrying... (attempt {attempt + 1}/{max_retries})")
                             await self.system_init.ui_server.stop()
                             await asyncio.sleep(2)
                         else:
-                            logger.error("UI server failed to start after retries")
+                            logger.error("UI server failed to become healthy after retries")
                             return False
                             
                     except Exception as e:
                         if attempt < max_retries - 1:
-                            logger.warning(f"Failed to start UI server, retrying... (attempt {attempt + 1}/{max_retries})")
+                            logger.warning(f"Failed to start UI server, retrying... (attempt {attempt + 1}/{max_retries}): {e}")
                             await asyncio.sleep(2)
                         else:
                             logger.error(f"UI server start failed: {e}")
@@ -358,20 +359,18 @@ class SystemOrchestrator:
                 
             except Exception as e:
                 logger.error(f"UI server initialization failed: {e}")
+                logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
                 return False
                 
     async def initialize(self) -> bool:
-        """Initialize all system components in the correct order."""
-        console.rule("[bold blue]Local LLM Chat Interface - System Initialization")
-        
+        """Initialize and run the system."""
         try:
-            # Load configuration
-            self.system_init.config = await self.system_init._track(
-                "Loading configuration...",
-                self.system_init._load_config
-            )
+            console.rule("[bold blue]Local LLM Chat Interface - System Initialization")
             
-            # Initialize components in order
+            # Initialize system first
+            await self._init_system()
+            
+            # Initialize system components
             steps = [
                 ("Dependencies", self.ensure_dependencies),
                 ("Ollama", self.ensure_ollama),
@@ -380,17 +379,33 @@ class SystemOrchestrator:
             ]
             
             for name, step in steps:
-                if not await step():
-                    logger.error(f"{name} initialization failed")
+                try:
+                    if not await step():
+                        logger.error(f"{name} initialization failed")
+                        await self.cleanup()
+                        return False
+                except Exception as e:
+                    logger.error(f"{name} initialization failed: {e}")
                     await self.cleanup()
                     return False
-                    
+            
             console.rule("[bold green]Initialization Complete")
             logger.info("System is ready!")
+            
+            # Keep the application running until interrupted
+            try:
+                # Create an event to keep the main task running
+                running = asyncio.Event()
+                await running.wait()
+            except asyncio.CancelledError:
+                logger.info("Received shutdown signal")
+            finally:
+                await self.cleanup()
+            
             return True
             
         except Exception as e:
-            logger.error(f"Initialization failed: {e}")
+            logger.error(f"Initialization failed: {str(e)}")
             await self.cleanup()
             return False
             
@@ -419,21 +434,32 @@ class SystemOrchestrator:
                 except Exception as e:
                     logger.error(f"Failed to stop API server: {e}")
                     
-            if self.ollama_server:
-                try:
-                    self.ollama_server.stop()
-                except Exception as e:
-                    logger.error(f"Failed to stop Ollama server: {e}")
-                    
             # Kill any remaining processes on our ports
             ports = [
-                self.system_init.config.get("ports", {}).get("api", 8000),
-                self.system_init.config.get("ports", {}).get("ui", 8501)
+                self.system_init.config.ports.api,
+                self.system_init.config.ports.ui
             ]
             for port in ports:
-                if self._get_process_on_port(port):
-                    await self._kill_process_on_port(port)
+                try:
+                    if await self._check_port(port):
+                        await self._kill_process_on_port(port)
+                except Exception as e:
+                    logger.error(f"Failed to kill process on port {port}: {e}")
                     
+            # Clean up any temporary files
+            try:
+                temp_dir = Path(self.project_root) / "temp"
+                if temp_dir.exists():
+                    for item in temp_dir.iterdir():
+                        if item.is_dir() and item.name.startswith("streamlit_"):
+                            try:
+                                import shutil
+                                shutil.rmtree(item)
+                            except Exception as e:
+                                logger.warning(f"Failed to remove temp directory {item}: {e}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary files: {e}")
+            
         except Exception as e:
             logger.error(f"Cleanup failed: {e}")
             # Don't re-raise - we want to attempt all cleanup steps
@@ -611,7 +637,7 @@ class SystemOrchestrator:
                 logger.debug("Sending health check request to API server...")
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
-                        f"http://localhost:{self.system_init.config.get('ports', {}).get('api', 8000)}/health",
+                        f"http://localhost:{self.system_init.config.ports.api}",
                         timeout=2
                     ) as response:
                         logger.debug(f"Health check response: {response.status}")
@@ -648,13 +674,22 @@ def main():
             for task in pending:
                 task.cancel()
             
-            # Wait for task cancellation
+            # Wait for task cancellation with timeout
             if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                loop.run_until_complete(
+                    asyncio.wait(pending, timeout=5.0)
+                )
             
-            # Close the loop
-            loop.close()
-            
+            # Close the loop properly
+            try:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.run_until_complete(asyncio.gather(*asyncio.all_tasks(loop), return_exceptions=True))
+            except Exception as e:
+                logger.debug(f"Error during final cleanup: {e}")
+            finally:
+                loop.stop()
+                loop.close()
+                
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         sys.exit(1)

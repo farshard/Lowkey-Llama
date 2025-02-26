@@ -315,56 +315,66 @@ class UIServer:
             
             logger.info(f"Started UI server process (PID: {self._process.pid})")
             
-            # Wait for server to start
-            timeout = 60  # 60 second timeout
+            # Wait for server to start with improved error handling
+            timeout = 30  # Reduced timeout to 30 seconds
             start_time = time.time()
             last_log_time = 0
             log_interval = 5
             
             while time.time() - start_time < timeout:
-                # Check process status
+                # Check process status first
                 if not self._process.is_running():
                     stdout, stderr = self._process.communicate()
-                    logger.error("UI server process terminated unexpectedly")
+                    error_msg = "UI server process terminated unexpectedly"
+                    logger.error(error_msg)
                     logger.error(f"Exit code: {self._process.returncode}")
                     if stdout: logger.error(f"stdout:\n{stdout}")
                     if stderr: logger.error(f"stderr:\n{stderr}")
-                    raise Exception("UI server failed to start - process terminated")
+                    raise Exception(f"{error_msg}\nExit code: {self._process.returncode}\nStderr: {stderr}")
                 
                 # Try health check
                 try:
                     if await self.health_check():
                         logger.info("UI server started successfully")
                         return
-                except Exception as e:
+                except Exception:
+                    # Check for process output
+                    stdout = self._process.stdout.readline() if self._process.stdout else ""
+                    stderr = self._process.stderr.readline() if self._process.stderr else ""
+                    
+                    if stdout:
+                        logger.info(f"UI server stdout: {stdout.strip()}")
+                    if stderr:
+                        logger.warning(f"UI server stderr: {stderr.strip()}")
+                    
                     # Log progress periodically
                     current_time = time.time()
                     if current_time - last_log_time >= log_interval:
-                        logger.debug(f"Waiting for UI server to become healthy... ({int(current_time - start_time)}s)")
+                        elapsed = int(current_time - start_time)
+                        logger.info(f"Waiting for UI server to become healthy... ({elapsed}s/{timeout}s)")
                         last_log_time = current_time
-                
-                # Check process output for errors
-                stdout = self._process.stdout.readline() if self._process.stdout else ""
-                stderr = self._process.stderr.readline() if self._process.stderr else ""
-                
-                if stdout:
-                    logger.info(f"UI server stdout: {stdout.strip()}")
-                if stderr:
-                    logger.warning(f"UI server stderr: {stderr.strip()}")
                 
                 await asyncio.sleep(1)
             
             # If we get here, we've timed out
-            logger.error(f"UI server failed to start within {timeout} seconds")
+            error_msg = f"UI server failed to start within {timeout} seconds"
+            logger.error(error_msg)
+            
+            # Collect final output
             stdout, stderr = self._process.communicate()
             if stdout: logger.error(f"Final stdout:\n{stdout}")
             if stderr: logger.error(f"Final stderr:\n{stderr}")
-            raise Exception("UI server failed to start - timeout")
+            
+            # Kill the process
+            try:
+                self._process.kill()
+            except Exception as kill_error:
+                logger.error(f"Error killing UI server process: {kill_error}")
+            
+            raise TimeoutError(f"{error_msg}\nFinal stderr: {stderr}")
             
         except Exception as e:
             logger.error(f"Failed to start UI server: {e}")
-            import traceback
-            logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
             # Clean up process if it exists
             if hasattr(self, '_process') and self._process:
                 try:
@@ -374,7 +384,7 @@ class UIServer:
                         self._process.kill()
                 except Exception as cleanup_error:
                     logger.error(f"Error cleaning up UI server process: {cleanup_error}")
-            raise
+            raise  # Re-raise the exception to be handled by the caller
             
     async def stop(self):
         """Stop the UI server."""

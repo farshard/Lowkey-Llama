@@ -70,7 +70,15 @@ class OllamaClient:
             async with self._session.get(f"{self.base_url}/api/tags") as response:
                 if response.status == 200:
                     data = await response.json()
-                    return [model["name"] for model in data.get("models", [])]
+                    if isinstance(data, dict) and "models" in data:
+                        # New API format
+                        return [model["name"] for model in data["models"]]
+                    elif isinstance(data, list):
+                        # Old API format
+                        return [model["name"] for model in data]
+                    else:
+                        # Simplest format - just return the model names directly
+                        return [str(model) for model in data] if isinstance(data, list) else []
                 return []
         except Exception as e:
             logger.error(f"Failed to list models: {e}")
@@ -138,7 +146,7 @@ class OllamaClient:
             
             request = {
                 "model": model,
-                "prompt": prompt,
+                "prompt": prompt
             }
             
             if system:
@@ -147,33 +155,46 @@ class OllamaClient:
                 request["template"] = template
             if context:
                 request["context"] = context
+            if max_tokens is not None:
+                if not options:
+                    options = {}
+                options["num_predict"] = max_tokens
             if options:
                 request["options"] = options
-            if max_tokens:
-                if not options:
-                    request["options"] = {}
-                request["options"]["num_predict"] = max_tokens
                 
+            logger.debug(f"Sending request to Ollama: {request}")
+            
             async with self._session.post(
                 f"{self.base_url}/api/generate",
-                json=request
+                json=request,
+                timeout=ClientTimeout(total=120)  # Increase timeout for long generations
             ) as response:
-                if response.status == 200:
-                    # Read the first line of the response
-                    async for line in response.content:
-                        if line:
-                            try:
-                                data = json.loads(line)
-                                if "error" in data:
-                                    raise Exception(data["error"])
-                                return data
-                            except json.JSONDecodeError:
-                                continue
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"Ollama API error: {error_text}")
+                    raise OllamaError(f"Ollama API returned status {response.status}: {error_text}")
+                
+                # Read the first line of the response
+                async for line in response.content:
+                    if line:
+                        try:
+                            data = json.loads(line)
+                            if "error" in data:
+                                raise OllamaError(data["error"])
+                            return data
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to decode Ollama response: {e}")
+                            continue
+                
+                logger.error("No valid response received from Ollama")
                 return None
                 
+        except asyncio.TimeoutError:
+            logger.error("Request to Ollama timed out")
+            raise OllamaError("Request timed out")
         except Exception as e:
-            logger.error(f"Failed to generate response: {e}")
-            return None
+            logger.error(f"Failed to generate response: {e}", exc_info=True)
+            raise OllamaError(f"Failed to generate response: {str(e)}")
             
     async def embeddings(self, model: str, prompt: str) -> Dict:
         """Get embeddings for text.

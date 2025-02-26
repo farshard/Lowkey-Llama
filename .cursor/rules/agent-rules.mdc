@@ -1,6 +1,6 @@
 ---
 description: Agent command and tool execution
-globs: python*, pytest*, coverage*, mypy*, black*, flake8*, mkdocs*, mkdir*, rm*, cp*, mv*, chmod*, find*, grep*, tail*, cat*, pip*, poetry*, conda*, wheel*, twine*, git*, hg*, svn*, curl*, wget*, ssh*, scp*, rsync*, ps*, top*, kill*, screen*, tmux*, nohup*, streamlit*, uvicorn*, gunicorn*, hypercorn*, powershell*
+globs: python*, pytest*, coverage*, mypy*, black*, flake8*, mkdocs*, mkdir*, rm*, cp*, mv*, chmod*, find*, grep*, tail*, cat*, pip*, poetry*, conda*, wheel*, twine*, git*, hg*, svn*, curl*, wget*, ssh*, scp*, rsync*, ps*, top*, kill*, screen*, tmux*, nohup*, streamlit*, uvicorn*, gunicorn*, hypercorn*, powershell*, netstat, tasklist, type
 ---
 # Cursor Composer Agent Mode Rules
 

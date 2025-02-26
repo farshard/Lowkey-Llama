@@ -839,4 +839,24 @@ class ServiceManager:
                     pass
         except Exception as e:
             logger.warning(f"Failed to get process on port {port}: {e}")
-        return None 
+        return None
+
+class OllamaClient:
+    def __init__(self):
+        self.base_url = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
+        self.gpu_layers = int(os.getenv('OLLAMA_GPU_LAYERS', '28'))
+        self.num_gpu = int(os.getenv('CUDA_VISIBLE_DEVICES', '1'))
+        
+    async def generate(self, prompt: str, model: str, **kwargs):
+        try:
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "options": {
+                    "num_gpu": self.num_gpu,
+                    "num_thread": int(os.getenv('OLLAMA_THREAD_COUNT', '8')),
+                    "num_ctx": 4096
+                },
+                "stream": False
+            }
+            # ... rest of the method ... 

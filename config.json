@@ -2,7 +2,8 @@
     "ports": {
         "ollama": 11434,
         "api": 8001,
-        "streamlit": 8501
+        "streamlit": 8501,
+        "ui": 8501
     },
     "hosts": {
         "ollama": "localhost",
@@ -10,20 +11,20 @@
         "streamlit": "localhost"
     },
     "paths": {
-        "ollama": null,
+        "ollama": "C:\\Users\\offic\\AppData\\Local\\Programs\\Ollama\\ollama.EXE",
         "models": "models",
         "cache": "cache",
         "logs": "logs"
     },
     "models": {
         "mistral": {
-            "temp": 0.7,
-            "max_tokens": 2048,
+            "temp": 0.8,
+            "max_tokens": 1000,
             "context_window": 4096
         }
     },
-    "default_model": "mistral",
     "auto_open_browser": true,
+    "default_model": "mistral",
     "log_level": "info",
     "logging": {
         "level": "INFO",
@@ -34,5 +35,7 @@
         "enabled": false,
         "provider": "gtts",
         "voice": "en-US"
-    }
+    },
+    "ollama_host": "http://localhost:11434",
+    "ollama_models": "C:\\Users\\offic/.ollama/models"
 }

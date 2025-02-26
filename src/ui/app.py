@@ -20,6 +20,9 @@ project_root = Path(__file__).parent.parent.parent.resolve()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+# Import ConfigManager using absolute import from src
+from src.core.config import ConfigManager
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -27,9 +30,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize configuration
+config_manager = ConfigManager(config_path=str(project_root / "config.json"))
+
 # Get API configuration from environment
 api_host = os.getenv('API_HOST', 'localhost')
-api_port = int(os.getenv('API_PORT', '8001'))  # Default to 8001 if not set
+api_port = int(os.getenv('API_PORT', '8001'))  # Changed from 8000 to 8001
 api_base_url = f"http://{api_host}:{api_port}"
 
 logger.info(f"Initializing UI with API endpoint: {api_base_url}")
@@ -239,12 +245,14 @@ def main():
             # Get LLM response
             with st.spinner("Generating response..."):
                 response = requests.post(
-                    f'{api_base_url}/generate',
+                    f'{api_base_url}/chat',
                     json={
                         "model": selected_model,
                         "prompt": prompt,
                         "max_tokens": max_tokens,
-                        "temperature": temperature
+                        "options": {
+                            "temperature": temperature
+                        } if temperature is not None else {}
                     },
                     headers={'Content-Type': 'application/json'},
                     timeout=30

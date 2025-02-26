@@ -12,7 +12,7 @@ services:
       - "8501:8501"    # Streamlit UI
       - "8000:8000"    # FastAPI
     environment:
-      - OLLAMA_HOST=http://localhost:11434
+      - OLLAMA_HOST=0.0.0.0
       - STREAMLIT_SERVER_PORT=8501
       - API_PORT=8000
       # Hardware-specific settings
@@ -42,9 +42,11 @@ services:
     command: >
       sh -c "
         nohup ollama serve &
-        sleep 5 &&
+        sleep 10 &&
+        ollama pull mistral &&
         nohup uvicorn src.api_server:app --host 0.0.0.0 --port 8000 &
-        streamlit run src/chat_app.py --server.address 0.0.0.0 --server.port 8501
+        sleep 5 &&
+        streamlit run src/chat_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
       "
 
 # Create profile-specific compose files:

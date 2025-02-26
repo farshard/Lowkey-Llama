@@ -115,15 +115,18 @@ def main():
         
         try:
             # Run the orchestrator
-            loop.run_until_complete(orchestrator.initialize())
+            if not loop.run_until_complete(orchestrator.initialize()):
+                logger.error("System initialization failed")
+                sys.exit(1)
             
             # Wait for shutdown signal
             loop.run_until_complete(shutdown_event.wait())
             
+        except KeyboardInterrupt:
+            logger.info("Received keyboard interrupt")
         except Exception as e:
             logger.error(f"Error during orchestrator execution: {e}")
-            logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
-            raise
+            sys.exit(1)
         finally:
             # Run cleanup
             loop.run_until_complete(orchestrator.cleanup())
@@ -141,7 +144,6 @@ def main():
             
     except Exception as e:
         logger.error(f"Fatal error: {str(e)}")
-        logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
         sys.exit(1)
         
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ from .api import APIServer
 from .ui import UIServer
 from .ollama import OllamaClient
 from .dependencies import DependencyManager
+from .config import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,8 @@ class SystemInit:
     def __init__(self):
         """Initialize system."""
         self.project_root = Path(__file__).parent.parent.parent
-        self.config: Dict = {}
+        self.config_manager = ConfigManager(config_path=str(self.project_root / "config.json"))
+        self.config = self.config_manager.config
         self.api_server: Optional[APIServer] = None
         self.ui_server: Optional[UIServer] = None
         self.ollama: Optional[OllamaClient] = None
@@ -70,22 +72,6 @@ class SystemInit:
             self.progress.stop()
             self.progress = None
             
-    def _load_config(self) -> Dict:
-        """Load configuration from file."""
-        config_path = self.project_root / "config.json"
-        if not config_path.exists():
-            logger.warning("No config.json found, using defaults")
-            return {}
-            
-        try:
-            with open(config_path) as f:
-                config = json.load(f)
-                logger.info("Configuration loaded successfully")
-                return config
-        except Exception as e:
-            logger.error(f"Failed to load config: {e}")
-            return {}
-            
     async def _track(self, description: str, func, *args, **kwargs):
         """Track progress of an async function."""
         self._setup_progress()
@@ -104,9 +90,9 @@ class SystemInit:
         import psutil
         
         required_ports = {
-            "API": self.config.get("ports", {}).get("api", 8000),
-            "UI": self.config.get("ports", {}).get("ui", 8501),
-            "Ollama": self.config.get("ports", {}).get("ollama", 11434)
+            "API": self.config.ports.api,
+            "UI": self.config.ports.ui,
+            "Ollama": self.config.ports.ollama
         }
         
         for name, port in required_ports.items():
@@ -119,8 +105,8 @@ class SystemInit:
         
     async def ensure_ollama(self) -> bool:
         """Ensure Ollama is installed and running."""
-        host = self.config.get("hosts", {}).get("ollama", "localhost")
-        port = self.config.get("ports", {}).get("ollama", 11434)
+        host = self.config.hosts.ollama
+        port = self.config.ports.ollama
         
         self.ollama = OllamaClient(host=host, port=port)
         
@@ -143,17 +129,17 @@ class SystemInit:
         models = await self.ollama.list_models()
         if not models:
             logger.warning("No models available in Ollama")
-            default_model = self.config.get("models", {}).get("default")
-            if default_model:
-                logger.info(f"Pulling default model: {default_model}")
+            if self.config.default_model:
+                logger.info(f"Pulling default model: {self.config.default_model}")
                 try:
-                    async for progress in self.ollama.pull_model(default_model):
-                        logger.info(f"Pulling {default_model}: {progress['completed']}/{progress['total']} MB")
+                    async for progress in self.ollama.pull_model(self.config.default_model):
+                        if "status" in progress and "completed" in progress and "total" in progress:
+                            logger.info(f"Pulling {self.config.default_model}: {progress['completed']}/{progress['total']} MB")
                 except Exception as e:
-                    logger.error(f"Failed to pull model {default_model}: {e}")
+                    logger.error(f"Failed to pull model {self.config.default_model}: {e}")
                     logger.error("\nPlease pull the model manually:")
                     logger.error(f"1. Open a new terminal")
-                    logger.error(f"2. Run: ollama pull {default_model}")
+                    logger.error(f"2. Run: ollama pull {self.config.default_model}")
                     logger.error("\nAfter pulling the model, try running this application again.")
                     return False
                     
@@ -206,12 +192,6 @@ class SystemInit:
             # Set up logging
             self._setup_logging()
             
-            # Load config
-            self.config = await self._track(
-                "Loading configuration...",
-                self._load_config
-            )
-            
             # Check system requirements
             if not await self._track(
                 "Checking system requirements...",
@@ -220,13 +200,14 @@ class SystemInit:
                 raise Exception("System requirements not met")
                 
             # Initialize servers
-            api_host = self.config.get("hosts", {}).get("api", "localhost")
-            api_port = self.config.get("ports", {}).get("api", 8000)
+            api_host = self.config.hosts.api
+            api_port = self.config.ports.api
             self.api_server = APIServer(host=api_host, port=api_port)
             
-            ui_host = self.config.get("hosts", {}).get("ui", "localhost")
-            ui_port = self.config.get("ports", {}).get("ui", 8501)
-            self.ui_server = UIServer(api_host=api_host, api_port=api_port)
+            # Initialize UI server with correct API port
+            ui_host = self.config.hosts.ui
+            ui_port = self.config.ports.ui
+            self.ui_server = UIServer(api_host=api_host, api_port=api_port)  # Use the same API port as API server
             
             # Start servers
             api_task = asyncio.create_task(
@@ -250,7 +231,7 @@ class SystemInit:
             self._cleanup_progress()
             
             # Open browser if configured
-            if self.config.get("auto_open_browser", True):
+            if self.config.auto_open_browser:
                 import webbrowser
                 webbrowser.open(f"http://{ui_host}:{ui_port}")
                 
@@ -279,6 +260,21 @@ class SystemInit:
         except Exception as e:
             logger.error(f"Cleanup failed: {e}")
             
+    async def initialize(self):
+        """Initialize system configuration."""
+        try:
+            # Set up logging
+            self._setup_logging()
+            
+            # Load configuration
+            self.config = self.config_manager.load_config()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Initialization failed: {e}")
+            return False
+
 def main():
     """Main entry point."""
     # Set up signal handlers

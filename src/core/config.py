@@ -21,12 +21,23 @@ class PortConfig(BaseModel):
     ollama: int = Field(default=11434, gt=0, lt=65536)
     api: int = Field(default=8000, gt=0, lt=65536)
     streamlit: int = Field(default=8501, gt=0, lt=65536)
+    ui: int = Field(default=8501, gt=0, lt=65536)
 
 class PathConfig(BaseModel):
     ollama: Optional[str] = None
     models: str = Field(default="models")
     cache: str = Field(default="cache")
     logs: str = Field(default="logs")
+
+class LoggingConfig(BaseModel):
+    level: str = Field(default="INFO")
+    format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    file: str = Field(default="local_llm.log")
+
+class TTSConfig(BaseModel):
+    enabled: bool = Field(default=False)
+    provider: str = Field(default="gtts")
+    voice: str = Field(default="en-US")
 
 class AppConfig(BaseModel):
     ports: PortConfig = Field(default_factory=PortConfig)
@@ -36,6 +47,10 @@ class AppConfig(BaseModel):
     auto_open_browser: bool = True
     default_model: str = "mistral"
     log_level: str = Field(default="info", pattern="^(debug|info|warning|error|critical)$")
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    tts: TTSConfig = Field(default_factory=TTSConfig)
+    ollama_host: str = "http://localhost:11434"
+    ollama_models: str = os.path.expanduser("~/.ollama/models")
 
 class ConfigManager:
     def __init__(self, config_path: str = "config.json"):
