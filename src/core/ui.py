@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,24 @@ class UIServer:
     async def health_check(self) -> bool:
         """Check if UI server is healthy."""
         try:
-            # Check if port 8501 is in use
+            # First check if the process is running
+            if hasattr(self, '_process') and not self._process.is_running():
+                logger.error("UI server process is not running")
+                return False
+                
+            # Try to connect to the Streamlit server
             import socket
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                return s.connect_ex(('localhost', 8501)) == 0
+                s.settimeout(1.0)  # 1 second timeout
+                try:
+                    s.connect(('localhost', 8501))
+                    return True
+                except (socket.timeout, ConnectionRefusedError) as e:
+                    logger.debug(f"UI server not ready yet: {e}")
+                    return False
+                except Exception as e:
+                    logger.error(f"Error checking UI server health: {e}")
+                    return False
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False
@@ -236,13 +251,21 @@ class UIServer:
             import psutil
             from pathlib import Path
             
+            logger.info(f"Starting UI server with API endpoint: {self.api_base_url}")
+            
             # Get the absolute path to the project root
             project_root = Path(__file__).parent.parent.parent.resolve()
+            logger.debug(f"Project root: {project_root}")
             
             # Add project root to PYTHONPATH
             env = os.environ.copy()
             python_path = env.get('PYTHONPATH', '')
             env['PYTHONPATH'] = f"{project_root};{python_path}" if python_path else str(project_root)
+            
+            # Set API configuration for UI
+            env['API_HOST'] = 'localhost'
+            env['API_PORT'] = str(self.api_base_url.split(':')[-1])
+            logger.info(f"Setting API configuration - Host: {env['API_HOST']}, Port: {env['API_PORT']}")
             
             # Set Streamlit config environment variables
             env['STREAMLIT_BROWSER_GATHER_USAGE_STATS'] = 'false'
@@ -255,51 +278,102 @@ class UIServer:
             config_dir = project_root / "temp" / f"streamlit_{os.getpid()}"
             config_dir.mkdir(parents=True, exist_ok=True)
             env['STREAMLIT_CONFIG_DIR'] = str(config_dir)
+            logger.debug(f"Streamlit config directory: {config_dir}")
+            
+            # Verify UI app exists
+            ui_app_path = project_root / "src" / "ui" / "app.py"
+            if not ui_app_path.exists():
+                raise FileNotFoundError(f"UI app not found at {ui_app_path}")
+            logger.info(f"Found UI app at: {ui_app_path}")
             
             # Prepare command
             cmd = [
                 sys.executable,
                 "-m", "streamlit",
-                "run", str(project_root / "src" / "ui" / "app.py"),
+                "run", str(ui_app_path),
                 "--server.port=8501",
                 "--server.address=localhost",
                 "--server.headless=true",
                 "--server.fileWatcherType=none",
                 "--browser.gatherUsageStats=false"
             ]
+            logger.debug(f"Starting UI server with command: {' '.join(cmd)}")
             
             # On Windows, we need to create a new process group
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0
             
-            # Start the process
+            # Start the process with output redirection
             self._process = psutil.Popen(
                 cmd,
                 cwd=str(project_root),
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                creationflags=creation_flags
+                creationflags=creation_flags,
+                text=True  # Use text mode for output
             )
             
+            logger.info(f"Started UI server process (PID: {self._process.pid})")
+            
             # Wait for server to start
-            for _ in range(30):  # 60 second timeout
-                if await self.health_check():
-                    logger.info("UI server started successfully")
-                    return
-                await asyncio.sleep(2)
-                
-                # Check if process is still running
+            timeout = 60  # 60 second timeout
+            start_time = time.time()
+            last_log_time = 0
+            log_interval = 5
+            
+            while time.time() - start_time < timeout:
+                # Check process status
                 if not self._process.is_running():
                     stdout, stderr = self._process.communicate()
-                    logger.error(f"UI server process terminated unexpectedly")
-                    logger.error(f"stdout: {stdout.decode()}")
-                    logger.error(f"stderr: {stderr.decode()}")
-                    raise Exception("UI server failed to start")
-                    
-            raise Exception("UI server failed to start within timeout")
+                    logger.error("UI server process terminated unexpectedly")
+                    logger.error(f"Exit code: {self._process.returncode}")
+                    if stdout: logger.error(f"stdout:\n{stdout}")
+                    if stderr: logger.error(f"stderr:\n{stderr}")
+                    raise Exception("UI server failed to start - process terminated")
+                
+                # Try health check
+                try:
+                    if await self.health_check():
+                        logger.info("UI server started successfully")
+                        return
+                except Exception as e:
+                    # Log progress periodically
+                    current_time = time.time()
+                    if current_time - last_log_time >= log_interval:
+                        logger.debug(f"Waiting for UI server to become healthy... ({int(current_time - start_time)}s)")
+                        last_log_time = current_time
+                
+                # Check process output for errors
+                stdout = self._process.stdout.readline() if self._process.stdout else ""
+                stderr = self._process.stderr.readline() if self._process.stderr else ""
+                
+                if stdout:
+                    logger.info(f"UI server stdout: {stdout.strip()}")
+                if stderr:
+                    logger.warning(f"UI server stderr: {stderr.strip()}")
+                
+                await asyncio.sleep(1)
+            
+            # If we get here, we've timed out
+            logger.error(f"UI server failed to start within {timeout} seconds")
+            stdout, stderr = self._process.communicate()
+            if stdout: logger.error(f"Final stdout:\n{stdout}")
+            if stderr: logger.error(f"Final stderr:\n{stderr}")
+            raise Exception("UI server failed to start - timeout")
             
         except Exception as e:
             logger.error(f"Failed to start UI server: {e}")
+            import traceback
+            logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
+            # Clean up process if it exists
+            if hasattr(self, '_process') and self._process:
+                try:
+                    self._process.terminate()
+                    await asyncio.sleep(1)
+                    if self._process.is_running():
+                        self._process.kill()
+                except Exception as cleanup_error:
+                    logger.error(f"Error cleaning up UI server process: {cleanup_error}")
             raise
             
     async def stop(self):

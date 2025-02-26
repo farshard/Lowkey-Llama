@@ -619,6 +619,9 @@ class ServiceManager:
             env['STREAMLIT_SERVER_FILE_WATCHER_TYPE'] = 'none'
             env['STREAMLIT_CONFIG_DIR'] = str(config_dir)
             
+            # Set API port for UI
+            env['API_PORT'] = str(self.config_manager.config.ports.api)
+            
             cmd = [
                 sys.executable,
                 "-m", "streamlit",
@@ -639,9 +642,10 @@ class ServiceManager:
                 cmd,
                 cwd=str(project_root),
                 env=env,
-                stdout=None,
-                stderr=None,
-                creationflags=creation_flags
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=creation_flags,
+                text=True
             )
             self.processes["ui"] = process
             
@@ -653,13 +657,25 @@ class ServiceManager:
                     
                 # Check if process is still running
                 if not process.is_running():
-                    logger.error("UI process terminated unexpectedly")
+                    stdout, stderr = process.communicate()
+                    logger.error(f"UI process terminated unexpectedly\nStdout: {stdout}\nStderr: {stderr}")
                     return False
                     
-                logger.info("UI started successfully")
-                return True
+                # Try to connect to verify it's responding
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get('http://localhost:8501/_stcore/health', timeout=1) as response:
+                            if response.status == 200:
+                                logger.info("UI started successfully")
+                                return True
+                except Exception as e:
+                    logger.debug(f"UI not ready yet: {e}")
+                    await asyncio.sleep(1)
+                    continue
                 
             logger.error("UI failed to start within timeout")
+            stdout, stderr = process.communicate()
+            logger.error(f"UI process output:\nStdout: {stdout}\nStderr: {stderr}")
             return False
             
         except Exception as e:

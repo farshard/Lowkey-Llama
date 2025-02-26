@@ -12,38 +12,141 @@ from tempfile import NamedTemporaryFile
 import uuid
 import atexit
 from pathlib import Path
-from typing import List, Dict
 import logging
+import sys
 
-from src.core.config import ConfigManager
-from src.core.services import ServiceManager
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent.resolve()
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
-# Initialize config manager
-config_manager = ConfigManager()
-service_manager = ServiceManager(config_manager)
-
-# Initialize logger
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
+# Get API configuration from environment
+api_host = os.getenv('API_HOST', 'localhost')
+api_port = int(os.getenv('API_PORT', '8001'))  # Default to 8001 if not set
+api_base_url = f"http://{api_host}:{api_port}"
+
+logger.info(f"Initializing UI with API endpoint: {api_base_url}")
+
+# Configure page
+st.set_page_config(
+    page_title="Local LLM Chat Interface",
+    page_icon="🤖",
+    layout="wide"
+)
+
+# Add custom CSS
+st.markdown("""
+    <style>
+        .stTextInput > div > div > input {
+            background-color: #f0f2f6;
+        }
+        .stTextArea > div > div > textarea {
+            background-color: #f0f2f6;
+        }
+        .stSelectbox > div > div > select {
+            background-color: #f0f2f6;
+        }
+        .stSlider > div > div > div > div {
+            background-color: #f0f2f6;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Initialize session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+    
+if "models" not in st.session_state:
+    st.session_state.models = []
+
 def check_api_health():
-    """Check if the API server is running and responsive"""
+    """Check if the API server is healthy."""
     try:
-        response = requests.get('http://localhost:8000/health', timeout=5)
+        response = requests.get(f"{api_base_url}/health")
         if response.status_code == 200:
-            health_data = response.json()
-            return health_data.get('status') == 'healthy'
+            logger.info("API server is healthy")
+            return True
+        logger.error(f"API server returned status code: {response.status_code}")
         return False
-    except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-        logger.error(f"API health check failed: {e}")
+    except Exception as e:
+        logger.error(f"Failed to connect to API server: {e}")
         return False
 
 def check_ollama_health():
-    """Check if Ollama is running and responsive"""
+    """Check if Ollama service is healthy."""
     try:
-        response = requests.get('http://localhost:11434/api/tags', timeout=5)
-        return response.status_code == 200
-    except:
+        response = requests.get("http://localhost:11434/api/tags")
+        if response.status_code == 200:
+            logger.info("Ollama service is healthy")
+            return True
+        logger.error(f"Ollama service returned status code: {response.status_code}")
         return False
+    except Exception as e:
+        logger.error(f"Failed to connect to Ollama service: {e}")
+        return False
+
+# Check services health
+api_healthy = check_api_health()
+ollama_healthy = check_ollama_health()
+
+if not api_healthy:
+    st.error("⚠️ API server is not responding. Please check if the server is running.")
+    st.stop()
+
+if not ollama_healthy:
+    st.error("⚠️ Ollama service is not responding. Please check if Ollama is running.")
+    st.stop()
+
+# Title
+st.title("Local LLM Chat Interface 🤖")
+
+# Clean up function for temporary files
+def cleanup_temp_files():
+    """Clean up temporary audio files."""
+    if hasattr(st.session_state, 'temp_audio_files'):
+        for file_path in st.session_state.temp_audio_files:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Failed to remove temp file {file_path}: {e}")
+
+# Register cleanup function
+atexit.register(cleanup_temp_files)
+
+def text_to_speech(text: str) -> str:
+    """Convert text to speech and return the audio HTML."""
+    try:
+        tts = gTTS(text=text, lang='en')
+        with NamedTemporaryFile(delete=False, suffix='.mp3') as fp:
+            tts.save(fp.name)
+            if not hasattr(st.session_state, 'temp_audio_files'):
+                st.session_state.temp_audio_files = []
+            st.session_state.temp_audio_files.append(fp.name)
+            
+            # Read the audio file and encode it
+            with open(fp.name, 'rb') as audio_file:
+                audio_bytes = audio_file.read()
+                audio_base64 = base64.b64encode(audio_bytes).decode()
+                
+            # Create audio HTML
+            audio_html = f"""
+                <audio autoplay>
+                    <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                    Your browser does not support the audio element.
+                </audio>
+            """
+            return audio_html
+    except Exception as e:
+        logger.error(f"Text-to-speech failed: {e}")
+        return ""
 
 def main():
     """Main UI function."""
@@ -69,6 +172,7 @@ def main():
     
     if not api_status or not ollama_status:
         st.error("Some services are offline. Please restart the application.")
+        return
 
     # Model settings section
     st.header("Model Settings")
@@ -109,95 +213,6 @@ def main():
     # TTS settings
     st.header("Text-to-Speech")
     st.session_state.tts_enabled = st.toggle("Enable voice responses", value=st.session_state.tts_enabled)
-    
-    # Ollama Settings
-    st.header("Advanced Settings")
-    with st.expander("Ollama Configuration"):
-        current_path = config_manager.config.paths.ollama or ""
-        
-        # Display current Ollama status
-        if service_manager.is_ollama_process_running():
-            st.success("✓ Ollama is running")
-            if current_path:
-                st.info(f"Current Ollama path: {current_path}")
-        else:
-            st.error("✕ Ollama is not running")
-            if current_path:
-                st.warning(f"Configured path: {current_path} (not running)")
-            else:
-                st.warning("No Ollama path configured")
-        
-        new_path = st.text_input(
-            "Ollama Path", 
-            value=current_path,
-            help="Full path to ollama.exe (e.g., C:\\Program Files\\Ollama\\ollama.exe)"
-        )
-        
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            if st.button("Update Ollama Path"):
-                if new_path != current_path:
-                    if new_path:  # If a path was provided
-                        is_valid, error = service_manager.validate_ollama_executable(new_path)
-                        if is_valid:
-                            try:
-                                config_manager.save_user_config({
-                                    "paths": {"ollama": new_path}
-                                })
-                                st.success("✓ Ollama path updated! Please restart the application for changes to take effect.")
-                            except Exception as e:
-                                st.error(f"Failed to save configuration: {str(e)}")
-                        else:
-                            st.error(f"Invalid Ollama executable: {error}")
-                    else:  # If path was cleared
-                        try:
-                            config_manager.save_user_config({
-                                "paths": {"ollama": None}
-                            })
-                            st.success("✓ Reset to default path")
-                        except Exception as e:
-                            st.error(f"Failed to reset configuration: {str(e)}")
-        with col2:
-            if st.button("Reset to Default"):
-                try:
-                    config_manager.save_user_config({
-                        "paths": {"ollama": None}
-                    })
-                    st.success("✓ Reset to default path")
-                    new_path = ""
-                except Exception as e:
-                    st.error(f"Failed to reset configuration: {str(e)}")
-        with col3:
-            if st.button("Detect Path"):
-                detected_path = service_manager.find_ollama_path()
-                if detected_path:
-                    st.success(f"✓ Found Ollama at: {detected_path}")
-                    new_path = detected_path
-                else:
-                    st.error("Could not detect Ollama path automatically")
-                    st.info("Please install Ollama from https://ollama.ai/download")
-
-    # Installation Help (moved outside the Ollama Configuration expander)
-    with st.expander("Installation Help"):
-        st.markdown("""
-        ### Installing Ollama
-        
-        1. Download Ollama from [ollama.ai/download](https://ollama.ai/download)
-        2. Run the installer
-        3. Restart your computer if needed
-        4. Click 'Detect Path' above to automatically find Ollama
-        
-        Common installation paths:
-        - Windows: `C:\\Program Files\\Ollama\\ollama.exe`
-        - macOS: `/opt/homebrew/bin/ollama` or `/usr/local/bin/ollama`
-        - Linux: `/usr/local/bin/ollama`
-        
-        If Ollama is not found automatically:
-        1. Open a terminal/command prompt
-        2. Run `ollama --version`
-        3. If it works, Ollama is in your PATH
-        4. If not, find the full path to ollama.exe and enter it above
-        """)
 
     # Clear chat button
     if st.button("Clear Chat"):
@@ -224,7 +239,7 @@ def main():
             # Get LLM response
             with st.spinner("Generating response..."):
                 response = requests.post(
-                    'http://localhost:8000/generate',
+                    f'{api_base_url}/generate',
                     json={
                         "model": selected_model,
                         "prompt": prompt,
@@ -240,86 +255,25 @@ def main():
                 result = response.json()
                 assistant_response = result.get('response', '')
                 
-                if assistant_response:
-                    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-                    with st.chat_message("assistant"):
-                        st.markdown(assistant_response)
-                        # Generate and play audio if TTS is enabled
-                        if st.session_state.tts_enabled:
-                            audio_html = text_to_speech(assistant_response)
-                            if audio_html:
-                                st.markdown(audio_html, unsafe_allow_html=True)
-                else:
-                    st.error("Received empty response from the model")
+                # Add assistant message to chat history
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": assistant_response
+                })
                 
-        except ConnectionError:
-            error_message = "⚠️ Cannot connect to Ollama. Please make sure it's running on localhost:11434"
-            st.error(error_message)
-        except requests.exceptions.RequestException as e:
-            error_message = f"⚠️ API request failed: {str(e)}"
-            st.error(error_message)
-        except json.JSONDecodeError as e:
-            error_message = f"⚠️ Invalid JSON response: {str(e)}"
-            st.error(error_message)
+                # Display assistant response
+                with st.chat_message("assistant"):
+                    st.markdown(assistant_response)
+                    
+                    # Generate and play audio if enabled
+                    if st.session_state.tts_enabled:
+                        audio_html = text_to_speech(assistant_response)
+                        if audio_html:
+                            st.components.v1.html(audio_html, height=0)
+                
         except Exception as e:
-            error_message = f"⚠️ An error occurred: {str(e)}"
-            st.error(error_message)
-
-def text_to_speech(text):
-    """Convert text to speech and return the audio player HTML"""
-    try:
-        # Create a unique filename using UUID
-        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp_audio")
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_file = os.path.join(temp_dir, f"audio_{uuid.uuid4()}.mp3")
-        
-        # Clean up old temporary files
-        for old_file in st.session_state.temp_audio_files:
-            try:
-                if os.path.exists(old_file):
-                    os.unlink(old_file)
-            except Exception:
-                pass  # Ignore errors during cleanup
-        
-        # Generate speech
-        tts = gTTS(text=text, lang='en')
-        # Save to file
-        tts.save(temp_file)
-        
-        # Add new file to cleanup list
-        st.session_state.temp_audio_files.append(temp_file)
-        
-        # Read the file
-        with open(temp_file, 'rb') as audio_file:
-            audio_bytes = audio_file.read()
-        
-        # Encode to base64
-        audio_base64 = base64.b64encode(audio_bytes).decode()
-        
-        # Create audio HTML with controls
-        audio_html = f'''
-            <audio autoplay controls>
-                <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
-                Your browser does not support the audio element.
-            </audio>
-        '''
-        return audio_html
-    except Exception as e:
-        st.error(f"Error generating speech: {str(e)}")
-        return None
-
-# Cleanup function for temp files
-def cleanup_temp_files():
-    for file in st.session_state.temp_audio_files:
-        try:
-            if os.path.exists(file):
-                os.unlink(file)
-        except Exception:
-            pass
-    st.session_state.temp_audio_files = []
-
-# Register cleanup function
-atexit.register(cleanup_temp_files)
+            st.error(f"Error: {str(e)}")
+            logger.error(f"Chat error: {e}")
 
 if __name__ == "__main__":
     main()

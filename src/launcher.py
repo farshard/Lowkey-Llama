@@ -5,6 +5,9 @@ import sys
 import asyncio
 import logging
 from pathlib import Path
+import signal
+import traceback
+import platform
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.resolve()
@@ -78,16 +81,67 @@ def main():
         # Import here after path setup
         from core.orchestrator import SystemOrchestrator
         
-        # Initialize and start the system
+        # Initialize the orchestrator
         orchestrator = SystemOrchestrator(project_root=project_root)
-        asyncio.run(orchestrator.initialize())
         
-    except KeyboardInterrupt:
-        logging.info("Shutting down...")
-        asyncio.run(orchestrator.cleanup())
+        # Create an event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
+        # Define shutdown event
+        shutdown_event = asyncio.Event()
+        
+        def handle_shutdown():
+            logger.info("Received shutdown signal")
+            shutdown_event.set()
+        
+        # Set up platform-specific signal handling
+        if platform.system() == "Windows":
+            try:
+                import win32api
+                def windows_handler(type):
+                    handle_shutdown()
+                    return True
+                win32api.SetConsoleCtrlHandler(windows_handler, True)
+            except ImportError:
+                # Fallback to basic handling on Windows if pywin32 is not available
+                import signal
+                signal.signal(signal.SIGINT, lambda x, y: handle_shutdown())
+                signal.signal(signal.SIGTERM, lambda x, y: handle_shutdown())
+        else:
+            # Unix-like systems can use loop.add_signal_handler
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, handle_shutdown)
+        
+        try:
+            # Run the orchestrator
+            loop.run_until_complete(orchestrator.initialize())
+            
+            # Wait for shutdown signal
+            loop.run_until_complete(shutdown_event.wait())
+            
+        except Exception as e:
+            logger.error(f"Error during orchestrator execution: {e}")
+            logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
+            raise
+        finally:
+            # Run cleanup
+            loop.run_until_complete(orchestrator.cleanup())
+            
+            # Clean up pending tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            
+            # Wait for task cancellation
+            if pending:
+                loop.run_until_complete(asyncio.wait(pending, timeout=5.0))
+            
+            loop.close()
+            
     except Exception as e:
-        logging.error(f"Fatal error: {e}")
+        logger.error(f"Fatal error: {str(e)}")
+        logger.error(f"Traceback:\n{''.join(traceback.format_tb(e.__traceback__))}")
         sys.exit(1)
         
 if __name__ == "__main__":
