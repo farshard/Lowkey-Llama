@@ -32,7 +32,7 @@ A streamlined interface for interacting with local language models through Ollam
 The launcher will:
 1. Check and install dependencies
 2. Verify Ollama installation and pull required models
-3. Start the API server
+3. Start the API server (default port 8000, falls back to 8001-8005 if needed)
 4. Launch the Streamlit UI
 5. Open your default browser automatically
 
@@ -49,10 +49,11 @@ The launcher will:
   - Windows 10/11 or macOS 10.15+
 
 - **Network**
-  - Available ports:
-    - 8000 (API server)
-    - 8501 (Streamlit UI)
-    - 11434 (Ollama)
+  - The system dynamically manages ports:
+    - API server: starts on 8000, falls back to 8001-8005 if needed
+    - UI server: starts on 8501, falls back to 8502-8505 if needed
+    - Ollama: uses 11434 (must be available)
+  - The config.json is automatically updated with the actual ports being used
 
 ## Troubleshooting
 
@@ -60,8 +61,19 @@ The launcher will:
 
 1. **Port Conflicts**
    - Error: "Port X is already in use"
-   - Solution: Stop any running services on ports 8000, 8501, or 11434
-   - Alternative: Edit config.json to use different ports
+   - Solutions:
+     1. The system will automatically try fallback ports
+     2. Check the console output for the actual ports being used
+     3. The config.json file will be updated with the working ports
+     4. Restart your computer if ports are held by zombie processes
+
+2. **API Connection Issues**
+   - Error: "API request failed: 404 Not Found"
+   - Solutions:
+     1. The UI automatically uses the port from config.json
+     2. If you see this error, restart the application
+     3. The system will find available ports and update the configuration
+     4. If issues persist, try: `taskkill /F /IM python.exe` (Windows) or `pkill python` (macOS/Linux)
 
 2. **Ollama Issues**
    - Error: "Failed to start Ollama server"

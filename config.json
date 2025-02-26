@@ -1,7 +1,7 @@
 {
     "ports": {
         "ollama": 11434,
-        "api": 8000,
+        "api": 8001,
         "streamlit": 8501
     },
     "hosts": {

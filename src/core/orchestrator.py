@@ -14,6 +14,7 @@ from typing import Optional, Dict, List, Tuple
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.logging import RichHandler
+import json
 
 from core.dependencies import DependencyManager
 from core.launcher import SystemInit
@@ -168,6 +169,18 @@ class SystemOrchestrator:
                 logger.error(f"Ollama check failed: {e}")
                 return False
                 
+    async def _save_config(self) -> bool:
+        """Save the current configuration to file."""
+        try:
+            config_path = Path(self.project_root) / "config.json"
+            with open(config_path, 'w') as f:
+                json.dump(self.system_init.config, f, indent=4)
+            logger.info("Configuration updated and saved")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save configuration: {e}")
+            return False
+
     async def ensure_api_server(self) -> bool:
         """Ensure API server is running and healthy."""
         with console.status("[bold blue]Starting API server...") as status:
@@ -198,6 +211,9 @@ class SystemOrchestrator:
                 if "ports" not in self.system_init.config:
                     self.system_init.config["ports"] = {}
                 self.system_init.config["ports"]["api"] = port_to_use
+                
+                # Save the updated configuration
+                await self._save_config()
                 
                 # Initialize API server if not already initialized
                 if not hasattr(self.system_init, 'api_server') or not self.system_init.api_server:
@@ -278,9 +294,23 @@ class SystemOrchestrator:
                 # Check if port is available
                 ui_port = self.system_init.config.get("ports", {}).get("ui", 8501)
                 if not await self._check_port(ui_port):
-                    logger.error(f"Port {ui_port} is still in use after cleanup attempt")
-                    return False
-                
+                    # Try fallback ports
+                    fallback_ports = [8502, 8503, 8504, 8505]
+                    for port in fallback_ports:
+                        if await self._check_port(port):
+                            ui_port = port
+                            # Update config with new port
+                            if "ports" not in self.system_init.config:
+                                self.system_init.config["ports"] = {}
+                            self.system_init.config["ports"]["ui"] = port
+                            # Save the updated configuration
+                            await self._save_config()
+                            logger.info(f"Using fallback port {port} for UI server")
+                            break
+                    else:
+                        logger.error(f"No available ports found for UI server")
+                        return False
+
                 # Initialize UI server if not already initialized
                 if not hasattr(self.system_init, 'ui_server') or not self.system_init.ui_server:
                     api_host = self.system_init.config.get("hosts", {}).get("api", "localhost")
