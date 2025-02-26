@@ -1,0 +1,83 @@
+---
+description: Agent command and tool execution
+globs: python*, pytest*, coverage*, mypy*, black*, flake8*, mkdocs*, mkdir*, rm*, cp*, mv*, chmod*, find*, grep*, tail*, cat*, pip*, poetry*, conda*, wheel*, twine*, git*, hg*, svn*, curl*, wget*, ssh*, scp*, rsync*, ps*, top*, kill*, screen*, tmux*, nohup*, streamlit*, uvicorn*, gunicorn*, hypercorn*, powershell*
+---
+# Cursor Composer Agent Mode Rules
+
+## Core Principles
+1. **Always execute commands directly** in the terminal without asking for user permission or intervention.
+2. **Never output raw shell commands** for the user to copy and paste.
+3. **Use proper terminal context** for all command execution.
+4. **Take full ownership** of command execution and tool running.
+
+## Command Execution Rules
+
+### DO:
+- Execute all commands directly using the appropriate built-in tools
+- Use the terminal tool for all shell commands
+- Handle errors and exceptions gracefully
+- Provide clear feedback about command execution status
+- Chain multiple commands when appropriate
+- Use appropriate flags and options for commands
+
+### DON'T:
+- Ask "Should I run this command for you?"
+- Output commands with instructions like "Run this in your terminal"
+- Use code blocks containing shell commands expecting user execution
+- Request user to verify commands before execution
+- Split execution into multiple user-dependent steps
+
+## Terminal Usage Guidelines
+
+### DO:
+- Use the correct terminal context for the project
+- Consider the operating system when executing commands
+- Execute commands in the appropriate directory
+- Check command output and handle errors automatically
+- Chain multiple commands together using appropriate syntax
+- Provide clear explanations of what commands are doing
+
+### DON'T:
+- Ask users to navigate to specific directories manually
+- Request environment variable setup from users
+- Ask users to install dependencies manually
+- Expect users to handle error conditions
+
+## Tool Integration Guidelines
+
+### DO:
+- Directly integrate with all available tools (Git, npm, pip, etc.)
+- Execute tools with proper authentication when needed
+- Handle tool output and errors appropriately
+- Chain tool executions when logical
+- Provide explanations of tool operations being performed
+
+### DON'T:
+- Output tool commands for manual execution
+- Ask users to configure tools manually
+- Request users to prepare environments before tool execution
+
+## Error Handling
+
+### DO:
+- Catch and interpret errors automatically
+- Suggest fixes and implement them directly when possible
+- Retry failed commands with appropriate modifications
+- Provide clear explanations of errors and remediation steps taken
+
+### DON'T:
+- Output error messages without explanation
+- Ask users to debug or fix errors manually
+- Leave issues unresolved without clear next steps
+
+## Follow-up Actions
+
+### DO:
+- Chain necessary follow-up actions automatically
+- Verify command success before proceeding to next steps
+- Execute dependent commands in sequence
+- Provide status updates between command chains
+
+### DON'T:
+- Wait for user confirmation between related commands
+- Ask users to perform follow-up steps manually

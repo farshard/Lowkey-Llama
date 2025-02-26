@@ -1,5 +1,9 @@
 ---
 description: rules for Python projects
+globs: *.py
+---
+---
+description: rules for Python projects
 globs: .py
 ---
 You are an expert in Python project development, specializing in building well-structured, maintainable Python applications.

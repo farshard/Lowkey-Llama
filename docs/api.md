@@ -1,6 +1,8 @@
-# API Documentation
+# Local LLM API Documentation
 
-The Local LLM Chat Interface provides a RESTful API for integrating local language models into your applications.
+## Overview
+
+The Local LLM API provides a RESTful interface for interacting with local language models through Ollama. The API is built with FastAPI and provides endpoints for text generation, model management, and system health checks.
 
 ## Base URL
 
@@ -10,130 +12,105 @@ http://localhost:8000
 
 ## Authentication
 
-Currently, the API does not require authentication. For production deployments, consider implementing authentication using FastAPI's security features.
+The API is designed for local use and currently does not require authentication.
 
 ## Endpoints
 
-### Generate Text
+### Health Check
 
-Generate text responses from the LLM model.
+```http
+GET /health
+```
+
+Returns the current health status of the API server.
+
+**Response**
+```json
+{
+    "status": "healthy"
+}
+```
+
+### Generate Text
 
 ```http
 POST /api/generate
 ```
 
-#### Request Body
+Generate text using a specified language model.
 
+**Request Body**
 ```json
 {
-  "model": "mistral",
-  "prompt": "string",
-  "max_tokens": 500,
-  "temperature": 0.7
+    "model": "mistral",
+    "prompt": "What is artificial intelligence?",
+    "max_tokens": 500,
+    "temperature": 0.7
 }
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| model | string | The name of the Ollama model to use (default: "mistral") |
-| prompt | string | The input text prompt |
-| max_tokens | integer | Maximum number of tokens to generate (default: 500) |
-| temperature | float | Sampling temperature (0.0 to 1.0, default: 0.7) |
+| model | string | The name of the model to use |
+| prompt | string | The input text to generate from |
+| max_tokens | integer | Maximum number of tokens to generate |
+| temperature | float | Controls randomness (0.0 to 1.0) |
 
-#### Response
-
+**Response**
 ```json
 {
-  "response": "string"
+    "response": "Artificial intelligence (AI) is a branch of computer science..."
 }
 ```
 
-#### Example
-
-```bash
-curl -X POST "http://localhost:8000/api/generate" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "model": "mistral",
-           "prompt": "What is machine learning?",
-           "max_tokens": 100,
-           "temperature": 0.7
-         }'
-```
-
 ### List Models
-
-Get a list of available Ollama models.
 
 ```http
 GET /api/models
 ```
 
-#### Response
+Returns a list of available models.
 
+**Response**
 ```json
 {
-  "models": [
-    "mistral",
-    "llama2",
-    "codellama"
-  ]
+    "models": [
+        "mistral",
+        "codellama:34b-instruct-q4",
+        "mixtral:8x7b-instruct-q4"
+    ]
 }
-```
-
-#### Example
-
-```bash
-curl "http://localhost:8000/api/models"
 ```
 
 ## Error Handling
 
-The API uses standard HTTP status codes:
+The API uses standard HTTP status codes and returns error messages in JSON format:
 
+```json
+{
+    "detail": "Error message describing what went wrong"
+}
+```
+
+Common status codes:
 - 200: Success
 - 400: Bad Request
 - 404: Not Found
 - 500: Internal Server Error
-
-Error responses include a detail message:
-
-```json
-{
-  "detail": "Error message description"
-}
-```
+- 503: Service Unavailable (Ollama not running)
 
 ## Rate Limiting
 
-Currently, there is no rate limiting implemented. For production use, consider adding rate limiting using FastAPI middleware.
+The API currently does not implement rate limiting as it's designed for local use.
 
-## Streaming Responses
-
-Streaming responses are not yet implemented but planned for future releases. This will allow for real-time text generation.
-
-## Best Practices
-
-1. **Error Handling**
-   - Always handle potential API errors in your client code
-   - Implement retry logic for transient failures
-
-2. **Resource Management**
-   - Keep prompts concise and focused
-   - Monitor token usage to optimize costs
-
-3. **Performance**
-   - Cache frequently used responses
-   - Use appropriate max_tokens values
-
-## SDK Examples
+## Examples
 
 ### Python
 
 ```python
 import requests
 
-def generate_text(prompt, model="mistral"):
+def generate_text(prompt: str, model: str = "mistral") -> str:
     response = requests.post(
         "http://localhost:8000/api/generate",
         json={
@@ -143,6 +120,7 @@ def generate_text(prompt, model="mistral"):
             "temperature": 0.7
         }
     )
+    response.raise_for_status()
     return response.json()["response"]
 
 # Example usage
@@ -157,21 +135,47 @@ async function generateText(prompt, model = "mistral") {
     const response = await fetch("http://localhost:8000/api/generate", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json"
         },
         body: JSON.stringify({
             model,
             prompt,
             max_tokens: 500,
             temperature: 0.7
-        }),
+        })
     });
+    
+    if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+    }
+    
     const data = await response.json();
     return data.response;
 }
 
 // Example usage
 generateText("Explain quantum computing")
-    .then(result => console.log(result))
+    .then(response => console.log(response))
     .catch(error => console.error(error));
-``` 
+```
+
+## Best Practices
+
+1. **Error Handling**: Always implement proper error handling in your applications.
+2. **Connection Management**: Check the API health before making requests.
+3. **Resource Management**: Be mindful of model loading times and memory usage.
+4. **Prompt Engineering**: Structure your prompts clearly for better results.
+
+## Limitations
+
+1. The API is designed for local use only and should not be exposed to the internet.
+2. Response times may vary based on:
+   - Model size
+   - Available system resources
+   - Whether the model is already loaded
+3. Memory usage depends on the model size and number of concurrent requests.
+
+## Support
+
+For issues and feature requests, please visit our GitHub repository:
+[https://github.com/voolyvex/Local-LLM](https://github.com/voolyvex/Local-LLM) 

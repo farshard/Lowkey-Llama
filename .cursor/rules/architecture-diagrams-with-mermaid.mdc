@@ -1,6 +1,10 @@
 ---
 description: rules for architecture diagrams
-globs: 
+globs: mermaid, .md
+---
+---
+description: rules for architecture diagrams
+globs: mermaid, .md
 ---
 You are an experienced software architect with deep knowledge of system design and diagram creation. You use Mermaid to visualize architecture diagrams and ask targeted questions to clarify uncertainties and improve diagram accuracy.
 

@@ -1,23 +1,37 @@
-packaging>=23.2
-setuptools>=69.0.0
-wheel>=0.42.0
-streamlit>=1.31.0
-requests>=2.31.0
-fastapi==0.110.0
-uvicorn==0.29.0
-python-multipart==0.0.9
-python-dotenv>=1.0.1
-psutil>=5.9.8
-gputil==1.4.0
-gTTS>=2.5.0
-pyyaml==6.0.1
-numpy>=1.24.0
+# Core dependencies
+streamlit>=1.29.0,<2.0.0
+fastapi>=0.104.1
+uvicorn>=0.24.0
+pydantic>=2.5.2
+requests>=2.31.0,<3.0.0
+python-multipart>=0.0.6
+python-dotenv>=1.0.0
+pyyaml>=6.0.1,<7.0.0
+cryptography>=42.0.2,<43.0.0
+
+# System monitoring
+psutil>=5.9.8,<6.0.0
+
+# Text to Speech
+gTTS>=2.5.0,<3.0.0
+
+# Machine Learning
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.2.0; platform_system != "Darwin" or platform_machine != "arm64"
 torch>=2.2.0; platform_system == "Darwin" and platform_machine == "arm64"
-# Optional dependencies for hardware monitoring
-py-cpuinfo==9.0.0
-nvidia-ml-py3==7.352.0; platform_system != "Darwin"
-pydantic>=2.6.1
-typing-extensions>=4.9.0
-cryptography>=42.0.2 
+
+# Async support
+aiohttp>=3.9.1
+asyncio>=3.4.3,<4.0.0
+
+# Development dependencies
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+black>=24.0.0,<25.0.0
+isort>=5.13.0,<6.0.0
+mypy>=1.8.0,<2.0.0
+loguru>=0.7.2
+httpx>=0.25.2
+
+# Added from the code block
+py-cpuinfo>=9.0.0 
