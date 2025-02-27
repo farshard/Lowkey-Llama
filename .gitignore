@@ -89,3 +89,13 @@ site/
 .DS_Store
 .history
 specs.txt
+
+# Large binary files and installers
+OllamaSetup.exe
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.AppImage
+*.deb
+*.rpm
