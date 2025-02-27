@@ -118,7 +118,7 @@ setup_venv() {
 
 # Main setup process
 main() {
-    echo "Setting up Local LLM Chat Interface..."
+    echo "Setting up Lowkey Llama..."
     
     # Check hardware compatibility
     echo "Checking hardware compatibility..."
@@ -148,7 +148,7 @@ main() {
     mkdir -p logs temp models
 
     # Start the application
-    echo "Starting Local LLM Chat Interface..."
+    echo "Starting Lowkey Llama..."
     python src/launcher.py
 }
 

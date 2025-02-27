@@ -1,4 +1,4 @@
-"""Ollama server manager for Local LLM Chat Interface."""
+"""Ollama server manager for Lowkey Llama."""
 
 import os
 import sys

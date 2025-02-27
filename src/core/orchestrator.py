@@ -147,33 +147,117 @@ class SystemOrchestrator:
                         return False
                         
                     default_model = getattr(self.system_init.config, 'default_model', 'mistral')
-                    logger.info(f"Pulling default model: {default_model}")
+                    logger.info(f"Checking default model: {default_model}")
                     
-                    if not models or default_model not in models:
-                        try:
-                            async for progress in client.pull_model(default_model):
-                                if "status" in progress and "completed" in progress and "total" in progress:
-                                    status_msg = f"Pulling {default_model}: {progress['completed']}/{progress['total']} MB"
-                                    status.update(f"[bold blue]{status_msg}")
-                        except Exception as e:
-                            logger.error(f"Failed to pull model: {e}")
-                            return False
+                    # Handle model requirements
+                    if not models:
+                        logger.error("No models found")
+                        return False
+                        
+                    # For custom models like mistral-fixed, check if base model exists
+                    is_custom_model = "-" in default_model
+                    base_model = default_model.split("-")[0] if is_custom_model else default_model
+                    
+                    # Check if the default model exists in the available models
+                    model_exists = default_model in models
+                    
+                    # If the model doesn't exist, we need to either pull it or create it
+                    if not model_exists:
+                        # Check if it's a custom model that needs to be created from a modelfile
+                        if is_custom_model:
+                            logger.info(f"Default model {default_model} not found - checking if it's a custom model")
+                            
+                            # First ensure the base model exists
+                            if base_model not in models:
+                                logger.info(f"Pulling base model for custom model: {base_model}")
+                                try:
+                                    async for progress in client.pull_model(base_model):
+                                        if "status" in progress and "completed" in progress and "total" in progress:
+                                            status_msg = f"Pulling {base_model}: {progress['completed']}/{progress['total']} MB"
+                                            status.update(f"[bold blue]{status_msg}")
+                                except Exception as e:
+                                    logger.error(f"Failed to pull base model: {e}")
+                                    return False
+                            
+                            # Now try to create the custom model
+                            modelfile_path = Path(self.project_root) / "models" / f"{default_model}.modelfile"
+                            if modelfile_path.exists():
+                                logger.info(f"Creating custom model {default_model} from modelfile")
+                                ollama_path = getattr(self.system_init.config.paths, 'ollama', 'ollama')
                                 
-                    # Test model with simple inference
+                                # Use subprocess to run the create command
+                                try:
+                                    cmd = [ollama_path, "create", default_model, "-f", str(modelfile_path)]
+                                    logger.debug(f"Running command: {' '.join(cmd)}")
+                                    
+                                    # Use subprocess with async
+                                    proc = await asyncio.create_subprocess_exec(
+                                        *cmd,
+                                        stdout=asyncio.subprocess.PIPE,
+                                        stderr=asyncio.subprocess.PIPE
+                                    )
+                                    stdout, stderr = await proc.communicate()
+                                    
+                                    if proc.returncode != 0:
+                                        logger.error(f"Failed to create custom model: {stderr.decode()}")
+                                        # Fall back to using base model
+                                        logger.info(f"Falling back to base model: {base_model}")
+                                        self.system_init.config.default_model = base_model
+                                        await self._save_config()
+                                    else:
+                                        logger.info(f"Successfully created custom model {default_model}")
+                                        model_exists = True  # Set this to True since we just created the model
+                                except Exception as e:
+                                    logger.error(f"Failed to create custom model: {e}")
+                                    # Fall back to using base model
+                                    logger.info(f"Falling back to base model: {base_model}")
+                                    self.system_init.config.default_model = base_model
+                                    await self._save_config()
+                            else:
+                                logger.error(f"Modelfile for {default_model} not found at {modelfile_path}")
+                                # Fall back to using base model
+                                logger.info(f"Falling back to base model: {base_model}")
+                                self.system_init.config.default_model = base_model
+                                await self._save_config()
+                        else:
+                            # For non-custom models, try to pull the model directly
+                            logger.info(f"Pulling model: {default_model}")
+                            try:
+                                async for progress in client.pull_model(default_model):
+                                    if "status" in progress and "completed" in progress and "total" in progress:
+                                        status_msg = f"Pulling {default_model}: {progress['completed']}/{progress['total']} MB"
+                                        status.update(f"[bold blue]{status_msg}")
+                            except Exception as e:
+                                logger.error(f"Failed to pull model: {e}")
+                                return False
+                    
+                    # Test model with simple inference - use the model that should be available at this point
+                    test_model = default_model if default_model in await client.list_models() else base_model
+                    logger.info(f"Testing model: {test_model}")
+                    
                     try:
-                        response = await client.generate(
-                            model=default_model,
-                            prompt="Hello",
-                            max_tokens=10
+                        # Use our fixed chat method instead of generate
+                        response = await client.chat(
+                            model=test_model,
+                            messages=[
+                                {"role": "system", "content": "You are a helpful assistant."},
+                                {"role": "user", "content": "Hello, tell me about dogs in one sentence."}
+                            ],
+                            options={
+                                "temperature": 0.7,
+                                "num_predict": 100
+                            }
                         )
-                        if not response:
-                            logger.error("Model test failed")
+                        
+                        if not response or "message" not in response:
+                            logger.error(f"Model test failed: Invalid response format")
                             return False
+                            
+                        logger.info(f"Model test successful")
+                        return True
                     except Exception as e:
                         logger.error(f"Model test failed: {e}")
                         return False
-                        
-                    return True
                     
             except Exception as e:
                 logger.error(f"Ollama check failed: {e}")
@@ -365,7 +449,7 @@ class SystemOrchestrator:
     async def initialize(self) -> bool:
         """Initialize and run the system."""
         try:
-            console.rule("[bold blue]Local LLM Chat Interface - System Initialization")
+            console.rule("[bold blue]Lowkey Llama - System Initialization")
             
             # Initialize system first
             await self._init_system()

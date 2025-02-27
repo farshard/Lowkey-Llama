@@ -1,4 +1,4 @@
-"""Integration tests for Local LLM Chat Interface."""
+"""Integration tests for Lowkey Llama."""
 
 import pytest
 import asyncio

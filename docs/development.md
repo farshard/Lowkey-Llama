@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide provides information for developers who want to contribute to the Local LLM Chat Interface project.
+This guide provides information for developers who want to contribute to the Lowkey Llama project.
 
 ## Development Environment Setup
 

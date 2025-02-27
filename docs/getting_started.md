@@ -1,6 +1,6 @@
 # Getting Started with Local LLM Chat Interface
 
-This guide will help you set up and run the Local LLM Chat Interface on your system.
+This guide will help you set up and run Lowkey Llama on your system.
 
 ## Hardware Requirements
 

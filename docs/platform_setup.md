@@ -1,6 +1,6 @@
-# Platform-Specific Setup Guide
+# Platform Setup Guide
 
-This guide provides detailed setup instructions for running the Local LLM Chat Interface on different operating systems.
+This guide provides detailed setup instructions for running Lowkey Llama on different operating systems.
 
 ## macOS Setup
 

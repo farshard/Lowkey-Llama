@@ -1,4 +1,4 @@
-"""Configuration management for Local LLM Chat Interface."""
+"""Configuration management for Lowkey Llama."""
 
 from pathlib import Path
 import json
@@ -9,8 +9,16 @@ from pydantic import BaseModel, Field
 
 class ModelConfig(BaseModel):
     temp: float = Field(default=0.7, ge=0.0, le=1.0)
-    max_tokens: int = Field(default=500, gt=0)
+    max_tokens: int = Field(default=2048, gt=0)
     context_window: int = Field(default=4096, gt=0)
+    top_p: float = Field(default=0.9, ge=0.0, le=1.0)
+    top_k: float = Field(default=40.0, ge=0.0)
+    repeat_penalty: float = Field(default=1.1, ge=0.0, le=2.0)
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    system_prompt: str = Field(
+        default="You are a helpful, detailed assistant. You always provide complete, thorough responses. You never give one-word or extremely short answers. If asked for a story or explanation, you write multiple sentences with proper detail."
+    )
 
 class HostConfig(BaseModel):
     ollama: str = Field(default="localhost")
@@ -169,4 +177,26 @@ class ConfigManager:
             "models": {
                 model_name: updated_config
             }
-        }) 
+        })
+
+    def add_model_config(self, model_name: str, config: Dict[str, Any]) -> None:
+        """Add configuration for a new model
+        
+        Args:
+            model_name: Name of the model
+            config: Configuration dictionary
+        """
+        # First validate the config
+        valid_config = ModelConfig(**config)
+        
+        # Add to current configuration
+        self.config.models[model_name] = valid_config
+        
+        # Save to user config
+        self.save_user_config({
+            "models": {
+                model_name: config
+            }
+        })
+        
+        self.logger.info(f"Added configuration for model: {model_name}") 

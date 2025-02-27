@@ -1,4 +1,4 @@
-"""Streamlit UI for Local LLM Chat Interface."""
+"""Streamlit UI for Lowkey Llama."""
 
 import streamlit as st
 import requests
@@ -42,27 +42,30 @@ logger.info(f"Initializing UI with API endpoint: {api_base_url}")
 
 # Configure page
 st.set_page_config(
-    page_title="Local LLM Chat Interface",
-    page_icon="🤖",
-    layout="wide"
+    page_title="Lowkey Llama",
+    page_icon="🦙",
+    layout="centered",
+    initial_sidebar_state="expanded"
 )
 
-# Add custom CSS
+# Custom CSS for improved UI
 st.markdown("""
-    <style>
-        .stTextInput > div > div > input {
-            background-color: #f0f2f6;
-        }
-        .stTextArea > div > div > textarea {
-            background-color: #f0f2f6;
-        }
-        .stSelectbox > div > div > select {
-            background-color: #f0f2f6;
-        }
-        .stSlider > div > div > div > div {
-            background-color: #f0f2f6;
-        }
-    </style>
+<style>
+.stMarkdown h1 {
+    font-size: 2.5rem !important;
+}
+.stChatMessage {
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+.stTextInput input, .stTextArea textarea {
+    font-size: 1.1rem !important;
+}
+.stButton button {
+    font-size: 1.1rem !important;
+    padding: 0.5rem 1.5rem !important;
+}
+</style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
@@ -111,7 +114,7 @@ if not ollama_healthy:
     st.stop()
 
 # Title
-st.title("Local LLM Chat Interface 🤖")
+st.title("Lowkey Llama 🦙")
 
 # Clean up function for temporary files
 def cleanup_temp_files():
@@ -156,8 +159,11 @@ def text_to_speech(text: str) -> str:
 
 def main():
     """Main UI function."""
-    st.title("Local LLM Chat Interface")
-    
+    # Logo with constrained dimensions
+    logo_col = st.columns([1])[0]
+    with logo_col:
+        st.image("assets/lowkey-logo.png", width=300)  # Ideal width for most screens
+        
     # Initialize session state
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -183,39 +189,78 @@ def main():
     # Model settings section
     st.header("Model Settings")
     available_models = list(config_manager.config.models.keys())
+
+    # Add the custom model if it exists but isn't in config
+    try:
+        all_models = requests.get(f"{api_base_url}/models").json()
+        for model in all_models:
+            if model not in available_models and model.startswith("mistral"):
+                available_models.append(model)
+    except Exception as e:
+        logger.error(f"Failed to get additional models: {e}")
+
     default_model = config_manager.config.default_model
-    default_index = available_models.index(default_model) if default_model in available_models else 0
+    if "mistral-fixed" in available_models:
+        default_model = "mistral-fixed"  # Prefer our fixed model
     
+    default_index = available_models.index(default_model) if default_model in available_models else 0
+
     selected_model = st.selectbox(
         "Choose a model",
         available_models,
         index=default_index
     )
+
+    # Add note about fixed models
+    if "mistral" in selected_model:
+        if "fixed" in selected_model:
+            st.success("✅ You're using the optimized Mistral model with improved response completeness.")
+        else:
+            st.warning("⚠️ The standard Mistral model may give truncated responses. Try 'mistral-fixed' for better results.")
+
+    # Get model configuration (with fallback for new models)
+    try:
+        model_config = config_manager.get_model_config(selected_model)
+    except ValueError:
+        # Model not in config yet, use default values
+        logger.info(f"Model {selected_model} not found in config, using defaults")
+        from src.core.config import ModelConfig
+        model_config = ModelConfig()
+        
+        # Add this model to configuration 
+        config_manager.add_model_config(selected_model, model_config.model_dump())
     
-    model_config = config_manager.config.models.get(selected_model, {})
+    # Update info box for mistral-fixed specifically
+    if selected_model == "mistral-fixed":
+        st.info(f"""Model: {selected_model}
+        Context Window: {model_config.context_window}
+        Recommended for: General reasoning with comprehensive responses
+        Optimizations: Enhanced prompting and parameters for detailed outputs""")
+    else:
+        st.info(f"""Model: {selected_model}
+        Context Window: {model_config.context_window}
+        Recommended for: {'Code generation' if 'codellama' in selected_model 
+                         else 'General reasoning' if 'mixtral' in selected_model
+                         else 'Complex tasks' if 'llama2' in selected_model
+                         else 'General purpose'}""")
+
     temperature = st.slider(
         "Temperature",
         min_value=0.0,
         max_value=1.0,
-        value=model_config.temp,
+        value=getattr(model_config, 'temp', 0.8),
         step=0.1
     )
     
+    # Now set up slider with fallback values if needed
     max_tokens = st.slider(
-        "Max Tokens",
-        min_value=100,
-        max_value=model_config.context_window,
-        value=model_config.max_tokens,
-        step=100
+        "Max tokens to generate",
+        min_value=10,
+        max_value=getattr(model_config, 'context_window', 4096) if hasattr(model_config, 'context_window') else 4096,
+        value=min(getattr(model_config, 'max_tokens', 2048), 2048),  # Use default or cap at 2048
+        step=10
     )
     
-    st.info(f"""Model: {selected_model}
-    Context Window: {model_config.context_window}
-    Recommended for: {'Code generation' if 'codellama' in selected_model 
-                     else 'General reasoning' if 'mixtral' in selected_model
-                     else 'Complex tasks' if 'llama2' in selected_model
-                     else 'General purpose'}""")
-
     # TTS settings
     st.header("Text-to-Speech")
     st.session_state.tts_enabled = st.toggle("Enable voice responses", value=st.session_state.tts_enabled)
@@ -244,18 +289,21 @@ def main():
         try:
             # Get LLM response
             with st.spinner("Generating response..."):
+                # Construct a better request with all necessary parameters
+                request_data = {
+                    "model": selected_model,
+                    "prompt": f"{prompt}\n\nPlease give a detailed and complete answer:",
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    # Use a more forceful system prompt
+                    "system": "You are a helpful assistant. You MUST ALWAYS provide detailed, complete answers with multiple sentences. NEVER give short or one-word responses. Your answers should be comprehensive and thorough."
+                }
+                
                 response = requests.post(
                     f'{api_base_url}/chat',
-                    json={
-                        "model": selected_model,
-                        "prompt": prompt,
-                        "max_tokens": max_tokens,
-                        "options": {
-                            "temperature": temperature
-                        } if temperature is not None else {}
-                    },
+                    json=request_data,
                     headers={'Content-Type': 'application/json'},
-                    timeout=30
+                    timeout=120  # Increase timeout for longer responses
                 )
                 response.raise_for_status()
                 

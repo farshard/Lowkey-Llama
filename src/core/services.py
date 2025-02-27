@@ -1,4 +1,4 @@
-"""Service manager for Local LLM Chat Interface."""
+"""Service manager for Lowkey Llama."""
 
 import os
 import sys
@@ -16,7 +16,7 @@ import subprocess
 logger = logging.getLogger(__name__)
 
 class ServiceManager:
-    """Manages services for the Local LLM Chat Interface."""
+    """Manages services for Lowkey Llama."""
     
     OLLAMA_PATHS = [
         # Windows paths

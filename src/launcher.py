@@ -1,4 +1,4 @@
-"""Main launcher for Local LLM Chat Interface."""
+"""Main launcher for Lowkey Llama."""
 
 import os
 import sys
@@ -8,6 +8,7 @@ from pathlib import Path
 import signal
 import traceback
 import platform
+from PIL import Image
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.resolve()
@@ -114,6 +115,13 @@ def main():
                 loop.add_signal_handler(sig, handle_shutdown)
         
         try:
+            # Show logo on startup
+            try:
+                logo = Image.open('assets/lowkey-logo.png')
+                logo.show()  # This will open the image in default viewer
+            except Exception as e:
+                logger.warning(f"Could not display logo: {e}")
+            
             # Run the orchestrator
             if not loop.run_until_complete(orchestrator.initialize()):
                 logger.error("System initialization failed")

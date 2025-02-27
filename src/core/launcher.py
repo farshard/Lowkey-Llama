@@ -1,4 +1,4 @@
-"""Core launcher for Local LLM Chat Interface."""
+"""Core launcher for Lowkey Llama."""
 
 import os
 import sys
@@ -10,6 +10,7 @@ import platform
 from pathlib import Path
 from typing import Dict, Optional
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
+import psutil
 
 from .api import APIServer
 from .ui import UIServer
@@ -19,8 +20,8 @@ from .config import ConfigManager
 
 logger = logging.getLogger(__name__)
 
-class SystemInit:
-    """System initialization for Local LLM Chat Interface."""
+class SystemInitializer:
+    """System initialization for Lowkey Llama."""
     
     def __init__(self):
         """Initialize system."""
@@ -87,8 +88,6 @@ class SystemInit:
                 
     async def check_ports(self) -> bool:
         """Check if required ports are available."""
-        import psutil
-        
         required_ports = {
             "API": self.config.ports.api,
             "UI": self.config.ports.ui,
@@ -285,7 +284,7 @@ def main():
             
     # Run initialization
     try:
-        system = SystemInit()
+        system = SystemInitializer()
         asyncio.run(system.run_initialization())
     except KeyboardInterrupt:
         logger.info("Shutting down...")
@@ -297,7 +296,7 @@ async def cleanup(sig):
     """Clean up on signal."""
     logger.info(f"Received signal {sig.name}, shutting down...")
     try:
-        system = SystemInit()
+        system = SystemInitializer()
         await system.cleanup()
     except Exception as e:
         logger.error(f"Cleanup failed: {e}")

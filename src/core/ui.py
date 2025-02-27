@@ -111,8 +111,8 @@ class UIServer:
         """Run the Streamlit UI."""
         # Set page config
         st.set_page_config(
-            page_title="Local LLM Chat Interface",
-            page_icon="🤖",
+            page_title="Lowkey Llama",
+            page_icon="🦙",
             layout="wide"
         )
         
@@ -142,7 +142,7 @@ class UIServer:
             st.session_state.models = []
             
         # Title
-        st.title("Local LLM Chat Interface 🤖")
+        st.title("Lowkey Llama 🦙")
         
         # Sidebar
         with st.sidebar:

@@ -1,4 +1,4 @@
-"""Dependency management for Local LLM Chat Interface."""
+"""Dependency management for Lowkey Llama."""
 
 import os
 import sys

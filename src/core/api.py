@@ -1,4 +1,4 @@
-"""FastAPI server for Local LLM Chat Interface."""
+"""FastAPI server for Lowkey Llama."""
 
 import logging
 import time
@@ -60,7 +60,7 @@ class APIServer:
         """
         self.host = host
         self.port = port
-        self.app = FastAPI(title="Local LLM Chat Interface")
+        self.app = FastAPI(title="Lowkey Llama")
         self.ollama = OllamaClient()
         
         # Add CORS middleware
@@ -84,10 +84,10 @@ class APIServer:
             return HTMLResponse(content="""
                 <html>
                     <head>
-                        <title>Local LLM Chat Interface API</title>
+                        <title>Lowkey Llama API</title>
                     </head>
                     <body>
-                        <h1>Local LLM Chat Interface API</h1>
+                        <h1>Lowkey Llama API</h1>
                         <p>Available endpoints:</p>
                         <ul>
                             <li><a href="/health">/health</a> - Health check endpoint</li>
@@ -146,52 +146,129 @@ class APIServer:
             try:
                 logger.info(f"Received chat request for model: {request.model}")
                 
-                # Use the provided system prompt or the default one
-                system_prompt = request.system if request.system else DEFAULT_SYSTEM_PROMPT
+                # For Mistral models, use the chat completion API instead of generate
+                if "mistral" in request.model.lower():
+                    messages = [
+                        {
+                            "role": "system",
+                            "content": request.system if request.system else DEFAULT_SYSTEM_PROMPT
+                        },
+                        {
+                            "role": "user",
+                            "content": f"{request.prompt}\n\nPlease provide a detailed, comprehensive response with multiple sentences and paragraphs."
+                        }
+                    ]
+                    
+                    logger.info(f"Using chat API for {request.model}")
+                    logger.debug(f"Messages: {messages}")
+                    
+                    try:
+                        response = await self.ollama.chat(
+                            model=request.model,
+                            messages=messages,
+                            options={
+                                "temperature": request.temperature if request.temperature is not None else 0.7,
+                                "num_predict": request.max_tokens if request.max_tokens else 4096,
+                                "top_p": 0.95,
+                                "top_k": 60,
+                                "repeat_penalty": 1.18,
+                                "repeat_last_n": 64,
+                                "seed": 42
+                            }
+                        )
+                        
+                        logger.debug(f"Chat API response: {response}")
+                        
+                        # Extract response from chat format - handle different response formats
+                        if response and isinstance(response, dict):
+                            # Format 1: Standard message object with content
+                            if "message" in response and isinstance(response["message"], dict) and "content" in response["message"]:
+                                result = response["message"]["content"]
+                            # Format 2: Direct content field
+                            elif "content" in response:
+                                result = response["content"]
+                            # Format 3: Direct response field
+                            elif "response" in response:
+                                result = response["response"]
+                            # Format 4: Any text field we can find
+                            elif any(key in response for key in ["text", "output", "completion"]):
+                                for key in ["text", "output", "completion"]:
+                                    if key in response:
+                                        result = response[key]
+                                        break
+                            # Format 5: If we can't find any recognized field, convert the whole response
+                            else:
+                                logger.warning(f"Unrecognized response format, using full response: {response}")
+                                result = str(response)
+                            
+                            # Ensure we have a complete response
+                            if result and len(result.strip()) < 10:  # If suspiciously short
+                                logger.warning(f"Got suspiciously short response: {result}")
+                                # Try fallback to generate
+                                raise Exception("Response too short, falling back to generate")
+                            
+                            logger.info(f"Successfully processed chat response of length: {len(result) if result else 0}")
+                            return {"response": result}
+                        else:
+                            logger.error(f"Unexpected response type from Ollama chat: {type(response)}")
+                            if response:
+                                # Try to convert any response to a string
+                                return {"response": str(response)}
+                            raise HTTPException(status_code=500, detail="Invalid response format from model")
+                            
+                    except Exception as e:
+                        logger.error(f"Chat completion failed, falling back to generate: {e}")
+                        # Fall back to generate (continue to code below)
                 
-                # Format the chat context using Mistral's expected format
-                formatted_prompt = f"[INST] {system_prompt}\n\n{request.prompt} [/INST]"
-                
-                # Filter out unsupported parameters
+                # Standard generate approach for non-Mistral models or fallback
                 generate_kwargs = {
                     "model": request.model,
-                    "prompt": formatted_prompt,
+                    "prompt": f"{request.prompt}\n\nPlease provide a detailed, comprehensive response:",
+                    "options": {}
                 }
                 
-                # Handle options separately
-                options = {
-                    # Add GPU-specific options to help with CUDA issues
-                    "num_gpu": 1,  # Use single GPU
-                    "num_thread": 4,  # Reduce thread count
-                }
-                
-                # Add optional parameters if they are provided
-                if request.max_tokens:
-                    logger.debug(f"Setting max_tokens: {request.max_tokens}")
-                    options["num_predict"] = request.max_tokens
+                # Add system prompt separately
+                if request.system:
+                    generate_kwargs["system"] = request.system
+                else:
+                    generate_kwargs["system"] = DEFAULT_SYSTEM_PROMPT
+                    
+                # Add parameters
                 if request.temperature is not None:
-                    logger.debug(f"Setting temperature: {request.temperature}")
-                    options["temperature"] = request.temperature
-                
-                # Always include options since we have GPU settings
-                generate_kwargs["options"] = options
+                    generate_kwargs["options"]["temperature"] = request.temperature
+                else:
+                    generate_kwargs["options"]["temperature"] = 0.7
+                    
+                if request.max_tokens:
+                    generate_kwargs["options"]["num_predict"] = request.max_tokens
+                else:
+                    generate_kwargs["options"]["num_predict"] = 4096
+                    
+                generate_kwargs["options"]["top_p"] = 0.9
+                generate_kwargs["options"]["top_k"] = 40
+                generate_kwargs["options"]["repeat_penalty"] = 1.1
                 
                 logger.debug(f"Sending generate request with kwargs: {generate_kwargs}")
-                response = await self.ollama.generate(**generate_kwargs)
                 
-                if not response:
-                    logger.error("Ollama returned empty response")
-                    raise HTTPException(status_code=500, detail="Failed to generate response")
-                
-                # Extract the response text from Ollama's response
-                response_text = response.get('response', '')
-                if not response_text:
-                    logger.error(f"Unexpected response format from Ollama: {response}")
-                    raise HTTPException(status_code=500, detail="Invalid response format from model")
-                
-                logger.info("Successfully generated response")
-                return {"response": response_text}
-                
+                try:
+                    response = await self.ollama.generate(**generate_kwargs)
+                    
+                    if not response:
+                        logger.error("Ollama returned empty response")
+                        raise HTTPException(status_code=500, detail="Failed to generate response")
+                    
+                    # Extract the response text
+                    response_text = response.get('response', '')
+                    if not response_text:
+                        logger.error(f"Unexpected response format from Ollama: {response}")
+                        raise HTTPException(status_code=500, detail="Invalid response format from model")
+                    
+                    logger.info("Successfully generated response")
+                    return {"response": response_text}
+                except OllamaError as e:
+                    logger.error(f"Ollama error during generation: {str(e)}")
+                    raise HTTPException(status_code=500, detail=str(e))
+                    
             except OllamaError as e:
                 logger.error(f"Ollama error: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))

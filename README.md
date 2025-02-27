@@ -1,6 +1,10 @@
-# Local LLM Chat Interface
+<p align="center">
+  <img src="assets/lowkey-logo.png" alt="Lowkey Llama" width="600"/>
+</p>
 
-A streamlined interface for interacting with local language models through Ollama.
+<h3 align="center">A streamlined interface for interacting with local language models through Ollama</h3>
+
+> 🔒 **Privacy First**: Everything runs locally on your machine. No cloud services, no data collection, no external dependencies. Your conversations and data stay completely private.
 
 ## Quick Start
 
@@ -12,7 +16,7 @@ A streamlined interface for interacting with local language models through Ollam
 2. **Installation**
    ```bash
    # Clone the repository
-   git clone https://github.com/yourusername/Local-LLM.git
+   git clone https://github.com/farshard/Lowkey-Llama.git
    cd Local-LLM
 
    # Create and activate virtual environment
@@ -35,6 +39,40 @@ The launcher will:
 3. Start the API server (default port 8000, falls back to 8001-8005 if needed)
 4. Launch the Streamlit UI
 5. Open your default browser automatically
+
+## Custom Models
+
+This application supports creating and using custom models with optimized parameters:
+
+1. **Using Pre-configured Models**
+   - The application comes with `mistral-fixed` - an optimized version of Mistral for detailed responses
+   - Select it from the model dropdown in the UI
+
+2. **Creating Your Own Models**
+   ```bash
+   # Create a custom model using a modelfile
+   ollama create my-custom-model -f models/my-custom-model.modelfile
+   ```
+
+3. **Model Optimization**
+   - See [custom_models.md](docs/custom_models.md) for detailed instructions on:
+     - Creating custom models with specialized capabilities
+     - Optimizing parameters for different use cases
+     - Troubleshooting model issues
+     - Example modelfiles for different purposes
+
+4. **Adding to Configuration**
+   - Custom models are automatically detected
+   - You can add them to `config.json` for persistent settings:
+   ```json
+   "models": {
+       "my-custom-model": {
+           "temp": 0.7,
+           "max_tokens": 4096,
+           "context_window": 8192
+       }
+   }
+   ```
 
 ## System Requirements
 
@@ -95,6 +133,39 @@ The launcher will:
      1. Check internet connection
      2. Ensure sufficient disk space
      3. Try pulling model manually: `ollama pull mistral`
+
+### Short or Truncated Responses from Mistral
+
+If you're getting very short (one-word) responses from Mistral models, try these solutions:
+
+1. Use the `mistral-fixed` model (recommended):
+   ```bash
+   # Create the optimized model
+   ollama create mistral-fixed -f models/mistral-fixed.modelfile
+   
+   # Then select "mistral-fixed" in the model dropdown
+   ```
+
+2. The `mistral-fixed` model includes:
+   - Optimized parameters for detailed responses
+   - Enhanced system prompt forcing comprehensive answers
+   - Improved handling of the Ollama API's ndjson format
+   - Better fallback mechanisms for incomplete responses
+
+3. Adjust settings in the UI:
+   - Increase temperature (0.7-0.9) for more detailed responses
+   - Set max tokens higher (2048+) to allow for longer outputs
+   - Use the "mistral-fixed" model which is pre-configured for verbosity
+
+4. Be explicit in your prompts:
+   - Add phrases like "Please provide a detailed answer with multiple paragraphs"
+   - Ask for explanations: "Explain in detail..."
+   - Request specific number of examples or points
+
+5. For developers, see [custom_models.md](docs/custom_models.md) for:
+   - How to create custom models with specific optimization parameters
+   - Troubleshooting model response issues
+   - Advanced configuration options
 
 ### Advanced Troubleshooting
 
