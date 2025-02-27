@@ -110,15 +110,60 @@ Before you begin, ensure you have the following installed:
 
 ### Method 2: Docker Installation
 
-1. Build the Docker image:
+1. Clone the repository:
    ```bash
-   docker build -t local-llm .
+   git clone https://github.com/voolyvex/Local-LLM.git
+   cd Local-LLM
    ```
 
-2. Run using docker-compose:
+2. Use the Docker management script:
    ```bash
-   docker-compose up
+   # Make the script executable (Unix/MacOS)
+   chmod +x docker.sh
+   
+   # Start the application
+   ./docker.sh start
+   
+   # View available commands
+   ./docker.sh help
    ```
+
+   The script provides the following commands:
+   - `start`: Start all services
+   - `stop`: Stop all services
+   - `restart`: Restart all services
+   - `status`: Show container status
+   - `logs`: View logs from all services
+
+3. Hardware-Based Profiles:
+   The script automatically detects your hardware and selects the appropriate profile:
+   - `gpu-high`: For GPUs with 8GB+ VRAM
+   - `gpu-medium`: For GPUs with 6-8GB VRAM
+   - `gpu-low`: For GPUs with <6GB VRAM
+   - `cpu`: For systems without GPU
+
+4. Configuration:
+   The script automatically creates a `.env` file with default settings.
+   You can modify these settings:
+   ```env
+   PYTHON_VERSION=3.9
+   CUDA_VERSION=11.8.0
+   OLLAMA_PORT=11434
+   UI_PORT=8501
+   API_PORT=8000
+   ```
+
+   GPU-specific settings are automatically configured based on your hardware:
+   ```env
+   OLLAMA_GPU_LAYERS=35    # Varies by profile
+   OLLAMA_BATCH_SIZE=8     # Varies by profile
+   OLLAMA_CPU_LAYERS=all   # For CPU-only mode
+   ```
+
+5. Accessing the Application:
+   - Web UI: http://localhost:8501
+   - API Documentation: http://localhost:8000/docs
+   - Ollama API: http://localhost:11434
 
 ## Configuration
 

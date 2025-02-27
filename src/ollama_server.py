@@ -16,7 +16,7 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('ollama_server.log')
+        logging.FileHandler('logs/ollama_server.log')
     ]
 )
 

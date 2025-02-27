@@ -33,13 +33,33 @@ This guide provides information for developers who want to contribute to the Low
 ├── src/                  # Source code
 │   ├── chat_app.py      # Streamlit interface
 │   ├── api_server.py    # FastAPI server
-│   └── setup.py         # Package setup
+│   ├── launcher.py      # Application launcher
+│   ├── ollama_server.py # Ollama service manager
+│   └── core/            # Core functionality
+│       ├── config.py    # Configuration management
+│       ├── ui.py        # UI components
+│       └── ollama.py    # Ollama client
 ├── tests/               # Test suite
 │   ├── test_api.py
-│   └── test_chat.py
+│   ├── test_chat.py
+│   └── test_ollama.py
 ├── docs/                # Documentation
+│   ├── getting_started.md
+│   ├── development.md
+│   └── api.md
 ├── models/              # Model configurations
-├── requirements.txt     # Production dependencies
+├── docker/             # Docker configuration
+│   ├── Dockerfile
+│   ├── docker-entrypoint.sh
+│   └── docker-compose.yml
+├── scripts/            # Management scripts
+│   ├── docker.sh      # Docker management
+│   ├── start.sh       # Unix startup
+│   └── start.bat      # Windows startup
+├── logs/               # Log files
+├── cache/             # Cache directory
+├── temp/              # Temporary files
+├── requirements.txt    # Production dependencies
 └── requirements-dev.txt # Development dependencies
 ```
 
@@ -174,4 +194,83 @@ This guide provides information for developers who want to contribute to the Low
 - Create detailed bug reports
 - Ask questions in discussions
 
-Remember to always write clean, maintainable code and follow the project's conventions! 
+Remember to always write clean, maintainable code and follow the project's conventions!
+
+## Docker Development
+
+### Docker Files
+```
+.
+├── Dockerfile              # Main container definition
+├── docker-entrypoint.sh   # Container startup script
+├── docker.sh              # Host-side management script
+└── docker-compose.yml     # Service orchestration
+```
+
+### Docker Profiles
+The system supports different hardware profiles through Docker Compose:
+
+1. **High VRAM Profile** (`gpu-high`)
+   ```yaml
+   environment:
+     - OLLAMA_GPU_LAYERS=35
+     - OLLAMA_BATCH_SIZE=8
+     - OLLAMA_THREAD_COUNT=auto
+   ```
+
+2. **Medium VRAM Profile** (`gpu-medium`)
+   ```yaml
+   environment:
+     - OLLAMA_GPU_LAYERS=28
+     - OLLAMA_BATCH_SIZE=4
+     - OLLAMA_THREAD_COUNT=16
+   ```
+
+3. **Low VRAM Profile** (`gpu-low`)
+   ```yaml
+   environment:
+     - OLLAMA_GPU_LAYERS=20
+     - OLLAMA_BATCH_SIZE=2
+     - OLLAMA_THREAD_COUNT=8
+   ```
+
+4. **CPU Profile** (`cpu`)
+   ```yaml
+   environment:
+     - OLLAMA_GPU_LAYERS=0
+     - OLLAMA_CPU_LAYERS=all
+     - OLLAMA_BATCH_SIZE=1
+     - OLLAMA_THREAD_COUNT=auto
+   ```
+
+### Docker Development Workflow
+
+1. **Building Images**
+   ```bash
+   ./docker.sh start
+   ```
+
+2. **Testing Changes**
+   ```bash
+   # View logs
+   ./docker.sh logs
+   
+   # Restart services
+   ./docker.sh restart
+   
+   # Check status
+   ./docker.sh status
+   ```
+
+3. **Debugging**
+   - Check container logs: `docker-compose logs -f [service]`
+   - Shell into container: `docker-compose exec lowkey-llama bash`
+   - View resource usage: `docker stats`
+
+4. **Best Practices**
+   - Use multi-stage builds to minimize image size
+   - Keep base images updated
+   - Follow the principle of least privilege
+   - Use health checks
+   - Implement proper logging
+   - Handle signals correctly 

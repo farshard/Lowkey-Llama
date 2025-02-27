@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/lowkey-logo.png" alt="Lowkey Llama" width="600"/>
+  <img src="assets/lowkey-logo-pnk-775.png" alt="Lowkey Llama" width="400"/>
 </p>
 
-<h3 align="center">A streamlined interface for interacting with local language models through Ollama</h3>
+<h3 align="center">A personal interface for interacting with local language models through Ollama</h3>
 
-> 🔒 **Privacy First**: Everything runs locally on your machine. No cloud services, no data collection, no external dependencies. Your conversations and data stay completely private.
+> 🔒 **Privacy Statement**: Everything runs locally on your machine. No cloud services, no data collection, no external dependencies. Your conversations and data stay completely private.
 
 ## Quick Start
 
