@@ -90,21 +90,27 @@ Before you begin, ensure you have the following installed:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/voolyvex/Local-LLM.git
-   cd Local-LLM
+   git clone https://github.com/farshard/Lowkey-Llama.git
+   cd Lowkey-Llama
    ```
 
 2. Create a virtual environment:
    ```bash
+   # Windows
    python -m venv venv
-   # On Windows
    .\venv\Scripts\activate
-   # On Unix or MacOS
+   
+   # macOS/Linux
+   python3 -m venv venv
    source venv/bin/activate
    ```
 
 3. Install dependencies:
    ```bash
+   # Windows
+   python -m pip install -r requirements.txt
+   
+   # macOS/Linux
    pip install -r requirements.txt
    ```
 
@@ -112,37 +118,21 @@ Before you begin, ensure you have the following installed:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/voolyvex/Local-LLM.git
-   cd Local-LLM
+   git clone https://github.com/farshard/Lowkey-Llama.git
+   cd Lowkey-Llama
    ```
 
 2. Use the Docker management script:
    ```bash
-   # Make the script executable (Unix/MacOS)
+   # Windows
+   docker.bat start
+   
+   # macOS/Linux
    chmod +x docker.sh
-   
-   # Start the application
    ./docker.sh start
-   
-   # View available commands
-   ./docker.sh help
    ```
 
-   The script provides the following commands:
-   - `start`: Start all services
-   - `stop`: Stop all services
-   - `restart`: Restart all services
-   - `status`: Show container status
-   - `logs`: View logs from all services
-
-3. Hardware-Based Profiles:
-   The script automatically detects your hardware and selects the appropriate profile:
-   - `gpu-high`: For GPUs with 8GB+ VRAM
-   - `gpu-medium`: For GPUs with 6-8GB VRAM
-   - `gpu-low`: For GPUs with <6GB VRAM
-   - `cpu`: For systems without GPU
-
-4. Configuration:
+3. Configuration:
    The script automatically creates a `.env` file with default settings.
    You can modify these settings:
    ```env
@@ -150,19 +140,12 @@ Before you begin, ensure you have the following installed:
    CUDA_VERSION=11.8.0
    OLLAMA_PORT=11434
    UI_PORT=8501
-   API_PORT=8000
+   API_PORT=8002
    ```
 
-   GPU-specific settings are automatically configured based on your hardware:
-   ```env
-   OLLAMA_GPU_LAYERS=35    # Varies by profile
-   OLLAMA_BATCH_SIZE=8     # Varies by profile
-   OLLAMA_CPU_LAYERS=all   # For CPU-only mode
-   ```
-
-5. Accessing the Application:
+4. Accessing the Application:
    - Web UI: http://localhost:8501
-   - API Documentation: http://localhost:8000/docs
+   - API Documentation: http://localhost:8002/docs
    - Ollama API: http://localhost:11434
 
 ## Configuration
@@ -171,7 +154,7 @@ Before you begin, ensure you have the following installed:
    Create a `.env` file in the root directory:
    ```env
    OLLAMA_HOST=http://localhost:11434
-   API_PORT=8000
+   API_PORT=8002
    STREAMLIT_PORT=8501
    DEFAULT_MODEL=mistral
    ```
@@ -186,7 +169,11 @@ Before you begin, ensure you have the following installed:
 
 1. Start the Streamlit interface:
    ```bash
-   streamlit run src/chat_app.py
+   # Windows
+   python src\chat_app.py
+   
+   # macOS/Linux
+   python3 src/chat_app.py
    ```
 2. Open your browser at `http://localhost:8501`
 
@@ -194,9 +181,13 @@ Before you begin, ensure you have the following installed:
 
 1. Start the FastAPI server:
    ```bash
-   python src/api_server.py
+   # Windows
+   python src\api_server.py
+   
+   # macOS/Linux
+   python3 src/api_server.py
    ```
-2. Access the API documentation at `http://localhost:8000/docs`
+2. Access the API documentation at `http://localhost:8002/docs`
 
 ## Performance Optimization
 
@@ -233,8 +224,71 @@ Before you begin, ensure you have the following installed:
    - Reduce batch size
    - Check available RAM
 
+4. **Path Issues**
+   - Windows: Use backslashes in paths
+   - macOS/Linux: Use forward slashes
+   - Use `os.path.join()` in Python code
+
+5. **Permission Issues**
+   - Windows: Run as Administrator if needed
+   - macOS/Linux: Use `chmod +x` for scripts
+   - Check file ownership with `ls -l`
+
+6. **Python Command**
+   - Windows: Use `python`
+   - macOS/Linux: Use `python3`
+   - Set correct PATH environment variable
+
+7. **Port Conflicts**
+   ```bash
+   # Windows
+   netstat -ano | findstr :8002
+   
+   # macOS/Linux
+   lsof -i :8002
+   ```
+
 ## Next Steps
 
 - Read the [API Documentation](api.md) for integrating with other applications
 - Check [Model Configuration](../models/README.md) for customizing model behavior
-- See [Development Guide](development.md) for contributing to the project 
+- See [Development Guide](development.md) for contributing to the project
+
+## Testing Your Models
+
+### Testing for Hallucinations
+
+It's important to validate that your models provide accurate, factual responses. Here's how to test for hallucinations:
+
+1. Using the API directly:
+   ```bash
+   # Test with future predictions
+   curl -X POST "http://localhost:8002/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "model": "mistral-factual",
+       "prompt": "What will be the dominant programming language in 2030?",
+       "temperature": 0.5
+     }'
+
+   # Test with complex scientific questions
+   curl -X POST "http://localhost:8002/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "model": "mistral-factual",
+       "prompt": "What is dark matter made of at the quantum level?",
+       "temperature": 0.5
+     }'
+   ```
+
+2. Key aspects to test:
+   - Future predictions (model should express uncertainty)
+   - Scientific facts (model should acknowledge current limitations in knowledge)
+   - Recent events (model should clarify knowledge cutoff)
+   - Complex topics (model should distinguish between facts and theories)
+
+3. Evaluating responses:
+   - Look for explicit acknowledgment of uncertainty
+   - Check for clear distinction between facts and speculation
+   - Verify that the model admits when it doesn't have enough information
+   - Ensure responses include appropriate caveats and limitations 

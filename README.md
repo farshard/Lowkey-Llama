@@ -36,8 +36,8 @@
 The launcher will:
 1. Check and install dependencies
 2. Verify Ollama installation and pull required models
-3. Start the API server (default port 8000, falls back to 8001-8005 if needed)
-4. Launch the Streamlit UI
+3. Start the API server (port 8002)
+4. Launch the Streamlit UI (port 8501)
 5. Open your default browser automatically
 
 ## Custom Models
@@ -45,8 +45,14 @@ The launcher will:
 This application supports creating and using custom models with optimized parameters:
 
 1. **Using Pre-configured Models**
-   - The application comes with `mistral-fixed` - an optimized version of Mistral for detailed responses
-   - Select it from the model dropdown in the UI
+   - `mistral-factual`: Optimized for accurate, format-compliant responses
+     - Ultra-low temperature (0.01) for deterministic outputs
+     - Strict format enforcement with zero tolerance
+     - Specialized for exact word count requirements
+   - `mistral-format`: Optimized for precise formatting
+     - Extremely focused sampling (top-p: 0.1)
+     - Minimal token selection (top-k: 3)
+     - Format-first approach with strict verification
 
 2. **Creating Your Own Models**
    ```bash
@@ -66,8 +72,10 @@ This application supports creating and using custom models with optimized parame
    - You can add them to `config.json` for persistent settings:
    ```json
    "models": {
-       "my-custom-model": {
-           "temp": 0.7,
+       "mistral-factual": {
+           "temp": 0.01,
+           "top_p": 0.1,
+           "top_k": 3,
            "max_tokens": 4096,
            "context_window": 8192
        }
@@ -87,11 +95,11 @@ This application supports creating and using custom models with optimized parame
   - Windows 10/11 or macOS 10.15+
 
 - **Network**
-  - The system dynamically manages ports:
-    - API server: starts on 8000, falls back to 8001-8005 if needed
-    - UI server: starts on 8501, falls back to 8502-8505 if needed
-    - Ollama: uses 11434 (must be available)
-  - The config.json is automatically updated with the actual ports being used
+  - Fixed port configuration:
+    - API server: port 8002
+    - UI server: port 8501
+    - Ollama: port 11434 (must be available)
+  - The launcher automatically handles port cleanup and management
 
 ## Troubleshooting
 
