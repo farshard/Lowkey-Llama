@@ -162,7 +162,7 @@ def main():
     # Logo with constrained dimensions
     logo_col = st.columns([1])[0]
     with logo_col:
-        st.image("assets/lowkey-logo.png", width=300)  # Ideal width for most screens
+        st.image("assets/lowkey-logo-blu-300.png", width=300)  # Ideal width for most screens
         
     # Initialize session state
     if "messages" not in st.session_state:
