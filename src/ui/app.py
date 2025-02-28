@@ -114,7 +114,7 @@ if not ollama_healthy:
     st.stop()
 
 # Title
-st.title("Lowkey Llama 🦙")
+st.title("Lowkey Llama")
 
 # Clean up function for temporary files
 def cleanup_temp_files():
