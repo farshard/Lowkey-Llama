@@ -13,8 +13,12 @@ from fastapi.responses import JSONResponse
 from src.core.ollama import OllamaClient, OllamaError
 from src.core.config import ConfigManager
 
+# Set up logging
 logger = logging.getLogger(__name__)
+# Load configuration with port 8002
 config_manager = ConfigManager()
+# Ensure API port is 8002 for consistency with documentation
+API_PORT = 8002
 ollama_client = None
 
 @asynccontextmanager

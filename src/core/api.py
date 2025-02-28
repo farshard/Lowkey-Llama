@@ -25,8 +25,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app at module level
-app = FastAPI()
+# Create FastAPI app
+app = FastAPI(title="Lowkey Llama API")
 
 # Add CORS middleware
 app.add_middleware(
@@ -37,10 +37,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Store Ollama client in app state
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    logger.info("Initializing API server...")
+    try:
+        # Test Ollama connection
+        async with OllamaClient() as client:
+            await client.list_models()
+        logger.info("API server initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize API server: {e}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    logger.info("Shutting down API server...")
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy"}
+    try:
+        # Test Ollama connection
+        async with OllamaClient() as client:
+            await client.list_models()
+        return {"status": "healthy"}
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service unhealthy")
     
 @app.get("/models")
 async def list_models():
@@ -48,7 +74,12 @@ async def list_models():
     try:
         async with OllamaClient() as client:
             models = await client.list_models()
-            return models
+            # Filter out :latest tags and return unique base model names
+            unique_models = set()
+            for model in models:
+                base_name = model.split(':')[0] if ':' in model else model
+                unique_models.add(base_name)
+            return sorted(list(unique_models))  # Return sorted list for consistency
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -133,7 +164,7 @@ async def chat(request: ChatRequest):
 class APIServer:
     """API server for Local LLM."""
     
-    def __init__(self, host: str = "localhost", port: int = 8000):
+    def __init__(self, host: str = "localhost", port: int = 8002):
         """Initialize API server.
         
         Args:
@@ -257,7 +288,7 @@ if __name__ == "__main__":
     import asyncio
     
     async def main():
-        server = APIServer(host="localhost", port=8001)
+        server = APIServer(host="localhost", port=8002)
         try:
             await server.start()
             # Keep running until interrupted
