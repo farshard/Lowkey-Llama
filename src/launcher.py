@@ -115,23 +115,21 @@ def main():
                 loop.add_signal_handler(sig, handle_shutdown)
         
         try:
-            # Show logo on startup
-            try:
-                logo = Image.open('assets/lowkey-logo.png')
-                logo.show()  # This will open the image in default viewer
-            except Exception as e:
-                logger.warning(f"Could not display logo: {e}")
-            
             # Run the orchestrator
             if not loop.run_until_complete(orchestrator.initialize()):
                 logger.error("System initialization failed")
                 sys.exit(1)
             
-            # Wait for shutdown signal
-            loop.run_until_complete(shutdown_event.wait())
+            # Keep the application running until interrupted
+            try:
+                # Create an event to keep the main task running
+                running = asyncio.Event()
+                loop.run_until_complete(running.wait())
+            except asyncio.CancelledError:
+                logger.info("Received shutdown signal")
+            except KeyboardInterrupt:
+                logger.info("Received keyboard interrupt")
             
-        except KeyboardInterrupt:
-            logger.info("Received keyboard interrupt")
         except Exception as e:
             logger.error(f"Error during orchestrator execution: {e}")
             sys.exit(1)
