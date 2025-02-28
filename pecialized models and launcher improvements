@@ -1,0 +1,13 @@
+M	.cursor/rules/agent-rules.mdc
+M	README.md
+M	config.json
+M	docs/custom_models.md
+M	docs/development.md
+M	docs/getting_started.md
+M	src/api/server.py
+M	src/core/api.py
+A	src/core/api_launcher.py
+M	src/core/launcher.py
+M	src/core/ollama.py
+M	src/launcher.py
+M	src/ui/app.py
