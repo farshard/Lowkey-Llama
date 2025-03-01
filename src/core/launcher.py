@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
 import psutil
+from pydantic import BaseModel
 
 from .api import APIServer
 from .ui import UIServer

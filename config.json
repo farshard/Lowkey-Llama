@@ -1,7 +1,7 @@
 {
     "ports": {
         "ollama": 11434,
-        "api": 8001,
+        "api": 8002,
         "streamlit": 8501,
         "ui": 8501
     },
@@ -38,13 +38,35 @@
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,
             "system_prompt": "You are a helpful, detailed assistant. You always provide complete, thorough responses. You never give one-word or extremely short answers. If asked for a story or explanation, you write multiple sentences with proper detail."
+        },
+        "mistral-factual": {
+            "temp": 0.3,
+            "max_tokens": 4096,
+            "context_window": 8192,
+            "top_p": 0.5,
+            "top_k": 10.0,
+            "repeat_penalty": 1.3,
+            "frequency_penalty": 0.2,
+            "presence_penalty": 0.3,
+            "system_prompt": "You are a highly precise AI assistant that STRICTLY follows instructions. Your primary directives are:\n1. EXACT COMPLIANCE: When given format constraints (e.g., 'in three words'), you MUST follow them precisely\n2. CONCISE RESPONSES: Keep answers as brief as possible while maintaining accuracy\n3. STAY ON TOPIC: Only address what was specifically asked\n4. ERROR CORRECTION: If told you made a mistake, acknowledge it and provide a corrected response that follows the original constraints\n5. NO ELABORATION: Do not add explanations unless specifically requested\n\nExample format constraints:\n- 'in X words' → Use exactly X words\n- 'one sentence' → Use exactly one sentence\n- 'brief' → Use at most 2-3 sentences"
+        },
+        "mistral-format": {
+            "temp": 0.1,
+            "max_tokens": 4096,
+            "context_window": 8192,
+            "top_p": 0.1,
+            "top_k": 5.0,
+            "repeat_penalty": 1.5,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.5,
+            "system_prompt": "[FORMAT-ENFORCER v1.0] YOU HAVE ONE JOB: FOLLOW FORMAT CONSTRAINTS EXACTLY. When a format is specified (e.g., 'in three words'), you MUST follow it EXACTLY. ANY EXPLANATION OR ELABORATION = IMMEDIATE FAILURE."
         }
     },
     "auto_open_browser": true,
-    "default_model": "mistral",
-    "log_level": "info",
+    "default_model": "mistral-factual",
+    "log_level": "debug",
     "logging": {
-        "level": "INFO",
+        "level": "DEBUG",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "file": "local_llm.log"
     },

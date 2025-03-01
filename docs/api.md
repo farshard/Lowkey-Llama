@@ -84,9 +84,31 @@ Returns a list of available models.
 
 ## Specialized Models
 
+### mistral-factual
+
+Optimized for providing accurate, factual responses with reduced hallucination:
+
+```http
+POST /api/generate
+```
+
+**Request Body**
+```json
+{
+    "model": "mistral-factual",
+    "prompt": "What is dark matter?",
+    "temperature": 0.3
+}
+```
+
+This model:
+- Uses lower temperature (0.3) for more deterministic outputs
+- Includes uncertainty acknowledgment when facts are not known
+- Provides source context when available
+
 ### mistral-format
 
-Specialized for strict format compliance and word count requirements:
+Specialized for strict format compliance:
 
 ```http
 POST /api/generate
@@ -97,64 +119,22 @@ POST /api/generate
 {
     "model": "mistral-format",
     "prompt": "Define AI in exactly three words",
-    "temperature": 0.01
+    "temperature": 0.1
 }
 ```
 
 This model:
-- Uses extremely low temperature (0.01) for consistent formatting
-- Has strict format enforcement with zero tolerance
+- Uses very low temperature (0.1) for consistent formatting
+- Strictly adheres to word count requirements
 - Returns "Format error" if unable to match format exactly
-- Excludes ALL explanations, prefixes, suffixes, or punctuation
-- Optimized parameters:
-  - Temperature: 0.01 (almost deterministic)
-  - Top-p: 0.1 (extremely focused sampling)
-  - Top-k: 3 (minimal token selection)
+- Excludes explanations and parenthetical content
 
-**Example Request/Response**
-```
-Request: "what is a fact in three words?"
-❌ "Fact: Truth verified" (has prefix)
-❌ "Information true" (only two words)
-❌ "Information requires verification." (has punctuation)
-✓ "Format error" (when format cannot be matched exactly)
-```
-
-### mistral-factual
-
-Optimized for format-first factual responses with zero tolerance for format errors:
-
-```http
-POST /api/generate
-```
-
-**Request Body**
+**Example Response**
 ```json
 {
-    "model": "mistral-factual",
-    "prompt": "what is a fact in three words?",
-    "temperature": 0.01
+    "response": "Machines Learning Intelligence"
 }
 ```
-
-This model:
-- Uses extremely low temperature (0.01) for deterministic outputs
-- Has zero tolerance for format violations
-- Returns "Format error" if format requirements cannot be met exactly
-- Optimized parameters:
-  - Temperature: 0.01 (almost completely deterministic)
-  - Top-p: 0.1 (extremely focused sampling)
-  - Top-k: 3 (minimal token selection)
-
-**Example Request/Response**
-```
-Request: "what is a fact in three words?"
-❌ "A verified truth" (needs verification)
-❌ "Information requires verification" (format error - punctuation)
-✓ "Format error" (when format cannot be matched exactly)
-```
-
-Both models are designed with a strict "format-first" approach, meaning they will return "Format error" rather than provide an incorrect or improperly formatted response. This behavior ensures reliability and predictability in applications requiring exact format compliance.
 
 ## Error Handling
 

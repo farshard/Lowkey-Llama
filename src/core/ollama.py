@@ -63,22 +63,26 @@ class OllamaClient:
         """List available models.
         
         Returns:
-            List[str]: List of model names
+            List[str]: List of model names with :latest tags removed
         """
         try:
             await self.ensure_session()
             async with self._session.get(f"{self.base_url}/api/tags") as response:
                 if response.status == 200:
                     data = await response.json()
+                    models = []
                     if isinstance(data, dict) and "models" in data:
                         # New API format
-                        return [model["name"] for model in data["models"]]
+                        models = [model["name"].split(':')[0] for model in data["models"]]
                     elif isinstance(data, list):
                         # Old API format
-                        return [model["name"] for model in data]
+                        models = [model["name"].split(':')[0] for model in data]
                     else:
-                        # Simplest format - just return the model names directly
-                        return [str(model) for model in data] if isinstance(data, list) else []
+                        # Simplest format
+                        models = [str(model).split(':')[0] for model in data] if isinstance(data, list) else []
+                    
+                    # Get unique base names
+                    return sorted(list(set(models)))
                 return []
         except Exception as e:
             logger.error(f"Failed to list models: {e}")
