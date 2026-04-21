@@ -212,6 +212,11 @@ See [development.md](docs/development.md) for:
 - Testing guidelines
 - Contributing instructions
 
+## Agent Capability Security
+
+If you plan to extend local agents with OpenClaw-style actions (file organization, email triage, and other non-chat tasks), review the hardening guide first:
+- [OpenClaw expansion security checklist](docs/openclaw-security-checklist.md)
+
 ## Architecture
 
 The system uses a modular architecture with these main components:
